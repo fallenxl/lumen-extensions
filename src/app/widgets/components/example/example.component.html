@@ -3,8 +3,43 @@
     Copyright © 2023 ThingsBoard, Inc.
 
 -->
-<p>example works! XD</p>
-<button pButton type="button" label="Click" ></button>
-<p-button label="Click" ></p-button>
-<button pButton type="button" icon="pi pi-check" iconPos="left"></button>
-<p-button label="Click" icon="pi pi-check" iconPos="left"></p-button>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kode+Mono:wght@400..700&family=Press+Start+2P&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" integrity="sha512-wnea99uKIC3TJF7v4eKk4Y+lMz2Mklv18+r4na2Gn1abDRPPOeef95xTzdwGD9e6zXJBteMIhZ1+68QC5byJZw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+
+<div class="bg-white rounded-lg shadow-lg p-6 w-full h-full flex flex-col items-center justify-between">
+  <!-- Pantalla -->
+  <div [class.bg-blue-400]="isOn" [class.bg-gray-400]="!isOn" class="text-white rounded-lg p-4  mb-6 w-80">
+    <div class="flex justify-between items-center">
+      <div>
+        <p class="text-xl">Room</p>
+        <p class="text-6xl font-bold thermostat">{{ actualTemperature }}°C</p>
+      </div>
+      <div class="text-right">
+        <p class="text-xl">Set at</p>
+        <p class="text-2xl font-bold thermostat">{{ setTemperature }}°C</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Botones -->
+  <div class="flex space-x-4 justify-self-end">
+    <button (click)="togglePower()" class="bg-gray-300 p-4 rounded-full focus:outline-none">
+        <img width="20" height="20" src="https://img.icons8.com/metro/26/shutdown.png" alt="shutdown"/>
+    </button>
+    <button (click)="increaseTemperature()" class="bg-gray-300 p-4 rounded-full focus:outline-none" [disabled]="!isOn">
+      <svg  class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="19" x2="12" y2="5"></line>
+        <polyline points="5 12 12 5 19 12"></polyline>
+      </svg>
+    </button>
+    <button (click)="decreaseTemperature()" class="bg-gray-300 p-4 rounded-full focus:outline-none" [disabled]="!isOn">
+      <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <polyline points="19 12 12 19 5 12"></polyline>
+      </svg>
+    </button>
+  </div>
+</div>

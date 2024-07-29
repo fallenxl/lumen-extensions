@@ -1,6 +1,9 @@
 /**
  * Copyright © 2023 ThingsBoard, Inc.
  */
-p {
-  display: block;
+ @tailwind base;
+ @tailwind components;
+ @tailwind utilities;
+ .thermostat {
+    font-family: 'Kode Mono', monospace;
 }

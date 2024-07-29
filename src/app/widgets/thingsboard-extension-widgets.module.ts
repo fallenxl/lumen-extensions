@@ -11,7 +11,6 @@ import { SharedModule } from '@shared/public-api';
 import { HomeComponentsModule } from '@home/components/public-api';
 import { ExampleMap } from './components/map/example-map.component';
 import { CustomAlarmsTableWidgetComponent } from './components/alarm/custom-alarms-table-widget.component';
-
 @NgModule({
   declarations: [
     ExampleMap,
@@ -20,7 +19,8 @@ import { CustomAlarmsTableWidgetComponent } from './components/alarm/custom-alar
   imports: [
     CommonModule,
     HomeComponentsModule,
-    SharedModule
+    SharedModule,
+   
   ],
   exports: [
     ExampleMap,

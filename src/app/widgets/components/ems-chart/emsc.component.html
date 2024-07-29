@@ -1,0 +1,530 @@
+<!--
+
+    Copyright © 2023 ThingsBoard, Inc.
+
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&family=Press+Start+2P&display=swap"
+  rel="stylesheet"
+/>
+<link
+  rel="stylesheet"
+  href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css"
+  integrity="sha512-wnea99uKIC3TJF7v4eKk4Y+lMz2Mklv18+r4na2Gn1abDRPPOeef95xTzdwGD9e6zXJBteMIhZ1+68QC5byJZw=="
+  crossorigin="anonymous"
+  referrerpolicy="no-referrer"
+/>
+<link
+  rel="stylesheet"
+  href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+  integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A=="
+  crossorigin="anonymous"
+  referrerpolicy="no-referrer"
+/>
+
+<!-- Is loading -->
+<div
+  class="fixed top-0 left-0 flex items-center justify-center w-full h-full"
+  style="background: rgba(0, 0, 0, 0.2); z-index: 100"
+  *ngIf="isLoading"
+
+>
+  <div class="flex items-center gap-2 border bg-white px-2 py-1">
+    <small class="text-sm">Loading </small>
+  </div>
+</div>
+
+<!-- Hierarchy -->
+<div class="flex w-full relative h-full" style="min-height: 100%;">
+  <!-- Sidebar -->
+  <div
+    class="flex flex-col transition-all duration-300 items-center relative h-full"
+    [style]="{ width: isExpanded ? '25%' : '3%' }"
+  >
+    <div
+      class="absolute top-6 duration-300 transform translate-x-1/2 cursor-pointer flex items-center bg-white p-2 rounded-full shadow z-50 right-0"
+      (click)="toggleSidebar()"
+    >
+      <i class="fa-solid fa-chevron-left fill"></i>
+      <i class="fa-solid fa-chevron-right"></i>
+    </div>
+    <!-- Sidebar content -->
+    <div *ngIf="isExpanded" class="flex flex-col h-full w-full px-2">
+      <!-- Input search with icon -->
+      <div class="relative">
+        <i
+          class="fa-solid fa-search absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400"
+        ></i>
+        <input
+          type="text"
+          class="w-full border border-gray-300 rounded-sm pl-9 py-1 outline-none"
+          placeholder="Search"
+        />
+      </div>
+
+      <!-- Your expanded sidebar content here -->
+      <div *ngFor="let relation of entityRelations">
+        <ng-container
+          *ngIf="
+            relation.to.entityType === 'ASSET' ||
+            relation.to.entityType === 'CUSTOMER'
+          "
+        >
+          <div
+            (click)="
+              toggleExpand(relation);
+              relation.relations[0]?.to?.entityType === 'DEVICE' &&
+                selectAsset(relation, $event)
+            "
+            class="cursor-pointer hover:bg-gray-50 px-2 py-2 rounded-sm border-b text-gray-600"
+            [ngClass]="{ 'bg-gray-100': selectedAssets.includes(relation) }"
+          >
+            {{ relation.toName }}
+          </div>
+          <ul *ngIf="expandedStates[relation.to.id]" class="pl-2">
+            <li *ngFor="let subRelation of relation.relations" class="relative">
+              <ng-container
+                *ngTemplateOutlet="
+                  recursiveList;
+                  context: { $implicit: subRelation }
+                "
+              ></ng-container>
+            </li>
+          </ul>
+        </ng-container>
+      </div>
+      <div class="mt-auto flex w-full">
+        <small><strong>Lumen Widgets</strong> Beta v1.0.1 </small>
+      </div>
+    </div>
+  </div>
+
+  <ng-template #recursiveList let-relation>
+    <ng-container
+      *ngIf="
+        relation.to.entityType === 'ASSET' ||
+        relation.to.entityType === 'CUSTOMER'
+      "
+    >
+      <div
+        (click)="
+          toggleExpand(relation);
+          relation.relations[0]?.to?.entityType === 'DEVICE' &&
+            selectAsset(relation, $event)
+        "
+        class="cursor-pointer pl-4 py-2 hover:bg-gray-50 border-b relative"
+        [ngClass]="{ 'bg-gray-100': selectedAssets.includes(relation) }"
+      >
+        <span
+          class="absolute left-0 top-1/2 transform -translate-y-1/2 h-full border-l border-gray-300"
+        ></span>
+        {{ relation.toName }}
+      </div>
+      <ul *ngIf="expandedStates[relation.to.id]" class="pl-4">
+        <li *ngFor="let subRelation of relation.relations" class="relative">
+          <ng-container
+            *ngTemplateOutlet="
+              recursiveList;
+              context: { $implicit: subRelation }
+            "
+          ></ng-container>
+        </li>
+      </ul>
+    </ng-container>
+  </ng-template>
+  <!-- End sidebar -->
+
+  <!-- chart -->
+  <div
+    class="flex flex-col relative pl-6 pr-3 overflow-auto border-l border-r border-l-gray-200 border-r-gray-200"
+    style="width: 100%; min-height: 100%;"
+  >
+    <!-- Chart Header -->
+    <div
+      class="flex items-end justify-between gap-2 border-b border-dotted border-gray-200 py-2"
+    >
+      <small class="font-bold text-sm text-gray-500">
+        {{ intervalSelected.toString() }}
+        <span class="text-gray-600 font-normal"
+          >{{ resolutionSelected.name }}, {{ phaseTypeSelected }}</span
+        >
+      </small>
+
+      <div class="flex flex-col gap-4 items-end relative">
+        <!-- Graph options -->
+
+        <!-- Show filter -->
+        <div
+          class="border border-gray-300 px-2 rounded-full cursor-pointer flex items-center justify-center gap-2 w-28"
+          (click)="toggleFilterSidebar()"
+        >
+          <svg
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke-width="1"
+            stroke="currentColor"
+            style="width: 16px; height: 16px"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 0 1-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927a2.25 2.25 0 0 1-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 0 0-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0 1 12 3Z"
+            />
+          </svg>
+          <small *ngIf="toggleFilter">Hide filters</small>
+          <small *ngIf="!toggleFilter">Show filters</small>
+        </div>
+        <!-- End show filter -->
+        <div class="flex items-center gap-4 relative">
+          <i
+            class="fa-solid fa-chevron-left text-gray-500 cursor-pointer"
+            (click)="prevInterval()"
+          ></i>
+          <div class="px-10 cursor-pointer" (click)="toggleIntervalModal()">
+            <span class="text-gray-500">{{ intervalSelected.name }}</span>
+          </div>
+          <i
+            class="fa-solid fa-chevron-right text-gray-500 cursor-pointer"
+            (click)="nextInterval()"
+          ></i>
+          <!-- Modal Interval -->
+          <div
+            *ngIf="intervalModalIsOpen"
+            class="absolute top-6 right-4 bg-white border p-2 z-30"
+            style="width: auto"
+          >
+            <div class="flex gap-2 w-full justify-between">
+              <!-- <div class="flex items-center gap-2">
+                <i class="fa-solid fa-calendar"></i>
+                <small class="font-bold">Select interval</small>
+              </div> -->
+              <div class="flex flex-col items-center gap-2 overflow-auto px-2">
+                <small class="font-bold">Select interval</small>
+                <div
+                  *ngFor="let interval of intervals"
+                  class="flex items-center justify-center border px-3 w-32 cursor-pointer hover:bg-gray-50"
+                  (click)="selectInterval(interval)"
+                >
+                  <label class="cursor-pointer">{{ interval.name }}</label>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- End Modal Interval -->
+        </div>
+      </div>
+    </div>
+
+    <!-- End chart header -->
+
+    <!-- Graph -->
+    <div
+      *ngIf="isUpdated"
+      id="chartdiv"
+      style="width: 100%; min-height: 650px"
+      class="relative"
+    ></div>
+
+    <div *ngIf="isUpdated" id="legendwrapper">
+      <div
+     
+        id="legenddiv"
+      ></div>
+    </div>
+   
+
+    <!-- Summary data -->
+    <div *ngIf="isUpdated" class="summary-container mt-10" style="max-height: 600px;">
+      <div class="summary-header border-b border-b-gray-200">
+        <div
+          class="summary-title relative cursor-pointer"
+          (click)="setSummaryTableType('summary')"
+        >
+          <span
+            class="text-gray-500 border px-3 py-2 z-10 bg-white relative"
+            [ngStyle]="{
+              borderBottom: summaryTableType === 'summary' ? 'white' : 'none',
+              top: summaryTableType === 'summary' ? '1px' : '0'
+            }"
+            >Summary</span
+          >
+        </div>
+        <div
+          class="summary-title relative cursor-pointer"
+          (click)="setSummaryTableType('individual')"
+        >
+          <span
+            class="text-gray-500 border px-3 py-2 z-10 bg-white relative"
+            [ngStyle]="{
+              borderBottom:
+                summaryTableType === 'individual' ? 'white' : 'none',
+              top: summaryTableType === 'individual' ? '1px' : '0'
+            }"
+            >Individual</span
+          >
+        </div>
+      </div>
+      <div class="summary-grid" id="summary-grid"></div>
+    </div>
+
+    <div *ngIf="!isUpdated" class="flex" style="width: 100%; height: 100%">
+      <div class="flex flex-col py-10">
+        <span class="text-lg font-medium text-gray-700"
+          >No Metering Data Found</span
+        >
+        <small class="text-gray-500 text-xs"
+          >Unfortunately we could not find any metering data for your current
+          configuration.</small
+        >
+      </div>
+    </div>
+    <!-- End graph -->
+  </div>
+  <!-- End chart -->
+
+  <!-- Devices -->
+  <div
+    class="hierarchy_container overflow-auto px-4 relative   pl-6 duration-300"
+    style="width: 30%"
+    [ngClass]="{ hidden: !toggleFilter }"
+  >
+    <div
+      class="hierarchy_header sticky top-0 right-0 bg-white z-20 border-t border-dotted"
+    >
+      <div class="hierarchy_title flex items-center justify-between mt-2">
+        <button
+          [disabled]="selectedDeviceIds.length === 0 && !isUpdated"
+          (click)="updateChart()"
+          class="update_btn mb-5 py-1 px-2 text-white"
+          [ngClass]="{
+            'bg-gray-400 hover:bg-gray-400': selectedDeviceIds.length === 0,
+            'bg-gray-700 hover:bg-gray-600': selectedDeviceIds.length > 0
+          }"
+        >
+          <i class="fa-solid fa-rotate-right"></i>
+          Update
+        </button>
+      </div>
+    </div>
+    <div
+      class="bg-red-100 border-l-2 p-2 border-red-500 w-full"
+      *ngIf="isError"
+    >
+      <small class="font-medium">{{ isError }}</small>
+    </div>
+    <div
+      class="bg-yellow-100 border-l-2 p-2 border-yellow-500 w-full"
+      *ngIf="isAlert"
+    >
+      <small class="font-medium">{{ isAlert }}</small>
+    </div>
+    <div
+      class="border-b border-t border-gray-200 border-dotted flex items-center gap-2 text-gray-500 py-2 justify-between"
+    >
+      <div class="flex items-center gap-2">
+        <i class="fa-solid fa-list text-xs"></i>
+        <small class="title-section">Devices</small>
+      </div>
+      <div class="flex items-center gap-2">
+        <small
+          *ngIf="selectedDeviceIds.length > 1"
+          title="Clear all devices selected"
+          class="cursor-pointer"
+          (click)="setClearAll()"
+          >Clear all</small
+        >
+        <i
+          (click)="toggleExpandedSection('devices')"
+          *ngIf="expandedSections.devices"
+          class="fa-solid fa-minus cursor-pointer p-1"
+        ></i>
+        <i
+          (click)="toggleExpandedSection('devices')"
+          *ngIf="!expandedSections.devices"
+          class="fa-solid fa-plus cursor-pointer p-1"
+        ></i>
+      </div>
+    </div>
+    <!-- Render selected devices of selected assets -->
+    <div
+      class="hierarchy-list list-none pl-2 relative mt-4 duration-300"
+      *ngIf="expandedSections.devices"
+    >
+      <small *ngIf="selectedAssets.length === 0" class="text-gray-500 text-xs"
+        >No assets selected</small
+      >
+      <ul class="nested-list list-none pl-2 relative">
+        <li *ngFor="let asset of selectedAssets">
+          <div class="item">
+            <i
+              class="fa-solid fa-plus"
+              *ngIf="!asset.expanded"
+              (click)="toggle(asset)"
+            ></i>
+            <i
+              class="fa-solid fa-minus"
+              *ngIf="asset.expanded"
+              (click)="toggle(asset)"
+            ></i>
+            <span (click)="toggle(asset)">{{ asset.toName }}</span>
+          </div>
+          <ul *ngIf="asset.expanded" class="nested-list">
+            <li *ngFor="let device of assetDevices[asset.to.id]">
+              <div class="item">
+                <i
+                  *ngIf="device.relations.length > 0 && !device.expanded"
+                  class="fa-solid fa-plus"
+                  (click)="toggle(device)"
+                ></i>
+                <i
+                  *ngIf="device.relations.length > 0 && device.expanded"
+                  class="fa-solid fa-minus"
+                  (click)="toggle(device)"
+                ></i>
+                <input
+                  type="checkbox"
+                  name="item"
+                  [id]="device.to.id"
+                  [value]="device.to.id"
+                  [checked]="isSelected(device.to)"
+                  (change)="toggleSelection($event, device)"
+                />
+                <span>{{ device.label }}</span>
+              </div>
+              <ul *ngIf="device.expanded" class="nested-list">
+                <li *ngFor="let subDevice of device.relations">
+                  <div class="item">
+                    <input
+                      type="checkbox"
+                      name="item"
+                      [id]="subDevice.to.id"
+                      [value]="subDevice.to.id"
+                      [checked]="isSelected(subDevice.to)"
+                      (change)="toggleSelection($event, subDevice)"
+                    />
+                    <span>{{ subDevice.label }}</span>
+                  </div>
+                </li>
+              </ul>
+            </li>
+          </ul>
+        </li>
+      </ul>
+    </div>
+    <div
+      class="border-b border-t border-dotted border-gray-200 flex items-center gap-2 text-gray-500 py-2 mt-4 justify-between"
+    >
+      <div class="flex items-center gap-2">
+        <i class="fa-solid fa-bolt text-xs"></i>
+        <small class="title-section">Fields</small>
+      </div>
+      <div class="flex items-center gap-2">
+        <small
+          *ngIf="selectedKeys.length > 0"
+          title="Clear all devices selected"
+          class="cursor-pointer"
+          (click)="setClearAllFields()"
+          >Clear all</small
+        >
+        <i
+          (click)="toggleExpandedSection('fields')"
+          *ngIf="!expandedSections.fields"
+          class="fa-solid fa-plus cursor-pointer p-1 self-end"
+        ></i>
+        <i
+          (click)="toggleExpandedSection('fields')"
+          *ngIf="expandedSections.fields"
+          class="fa-solid fa-minus cursor-pointer p-1 self-end"
+        ></i>
+      </div>
+    </div>
+    <div
+      class="grid grid-cols-2 gap-5 p-2 duration-300"
+      *ngIf="expandedSections.fields"
+    >
+      <div *ngFor="let field of fields" class="flex items-center gap-2">
+        <input
+          type="checkbox"
+          [value]="field"
+          (click)="toggleField(field)"
+          [checked]="isSelectedField(field)"
+        />
+        <label class="">{{ field.name }}</label>
+      </div>
+    </div>
+    <div
+      (click)="toggleExpandedSection('resolution')"
+      class="border-b border-t border-dotted border-gray-200 flex items-center gap-2 text-gray-500 py-2 mt-4 justify-between cursor-pointer"
+    >
+      <div class="flex items-center gap-2">
+        <i class="fa-solid fa-sliders text-xs"></i>
+        <small class="title-section">Resolution</small>
+      </div>
+      <i
+        *ngIf="expandedSections.resolution"
+        class="fa-solid fa-minus cursor-pointer p-1 self-end"
+      ></i>
+      <i
+        *ngIf="!expandedSections.resolution"
+        class="fa-solid fa-plus cursor-pointer p-1 self-end"
+      ></i>
+    </div>
+    <div
+      class="grid grid-cols-2 gap-5 p-2 duration-300"
+      *ngIf="expandedSections.resolution"
+    >
+      <label
+        *ngFor="let resolution of resolutions"
+        class="flex items-center gap-2 m-2"
+      >
+        <input
+          type="radio"
+          name="resolution"
+          [value]="resolution.ts"
+          [disabled]="resolution.disabled"
+          [checked]="resolution.ts === resolutionSelected.ts"
+          (click)="changeResolution(resolution)"
+        />
+        {{ resolution.name }}
+      </label>
+    </div>
+    <div
+      (click)="toggleExpandedSection('phaseType')"
+      class="border-b border-t border-dotted border-gray-200 flex items-center gap-2 text-gray-500 py-2 mt-4 justify-between cursor-pointer"
+    >
+      <div class="flex items-center gap-2">
+        <i class="fa-solid fa-ellipsis text-xs"></i>
+        <small class="title-section">Phase Type</small>
+      </div>
+      <i
+        *ngIf="expandedSections.phaseType"
+        class="fa-solid fa-minus cursor-pointer p-1 self-end"
+      ></i>
+      <i
+        *ngIf="!expandedSections.phaseType"
+        class="fa-solid fa-plus cursor-pointer p-1 self-end"
+      ></i>
+    </div>
+    <div
+      class="flex items-center gap-2 duration-300"
+      *ngIf="expandedSections.phaseType"
+    >
+      <label
+        *ngFor="let type of phaseTypes"
+        class="flex items-center gap-2 m-2"
+      >
+        <input
+          type="radio"
+          name="type"
+          [value]="type"
+          [checked]="phaseTypeSelected === type"
+          (click)="changePhaseType(type)"
+        />
+        {{ type }}
+      </label>
+    </div>
+  </div>
+  <!-- End Devices -->
+</div>
