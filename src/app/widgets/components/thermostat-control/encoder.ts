@@ -465,6 +465,15 @@ function encodeDownlink(input) {
    * @example payload: { "temperature_control": { "mode": 2, "temperature": 25 }, "temperature_unit": 0 } output: FFB70219
    * @example payload: { "temperature_control": { "mode": 2, "temperature": 77 }, "temperature_unit": 1 } output: FFB701CD
    */
+
+
+  export enum TemperatureControlMode {
+    heat = 0,
+    emHeat = 1,
+    cool = 2,
+    auto = 3
+  }
+
   function setTemperatureControl(mode, temperature_target, temperature_unit) {
     var temperature_control_mode_values = [0, 1, 2, 3];
     if (temperature_control_mode_values.indexOf(mode) === -1) {
@@ -799,6 +808,12 @@ function encodeDownlink(input) {
    * @param {string} fan_mode values: (0: "auto", 1: "on", 2: "circulate")
    * @example { "fan_mode": 0 }
    */
+
+  export enum FanMode {
+    auto = 0,
+    on = 1,
+    circulate = 2
+  }
   function setFanMode(fan_mode) {
     var fan_mode_values = [0, 1, 2];
     if (fan_mode_values.indexOf(fan_mode) === -1) {
@@ -1162,6 +1177,8 @@ function encodeDownlink(input) {
    * @param {Array} btn_locked values: (0: "power", 1: "up", 2: "down", 3: "fan", 4: "mode", 5: "reset")
    * @example { "child_lock_config": { "power_button": 1, "up_button": 0, "down_button": 1, "fan_button": 0, "mode_button": 0 , "reset_button": 1 } }
    */
+
+  
   function setChildLock(child_lock_config) {
     var button_mask_bit_offset = {
       power_button: 0,

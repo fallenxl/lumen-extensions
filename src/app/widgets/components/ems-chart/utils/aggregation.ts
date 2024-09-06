@@ -20,14 +20,34 @@ export function getTypeChart(str: string): string {
 }
 
 
-export function fillData(data: any[], endDate: number, resolution: number): any[] {
-  let res = [];
-  let lastDate = data[data.length - 1].date + resolution;
-
-  while (lastDate <= endDate) {
-    res.push({ date: lastDate, value: null});
-    lastDate += resolution;
+export function fillData(data: any[], startDate: number, endDate: number, resolution: number): any[] {
+  // Validaciones iniciales
+  if (startDate >= endDate) {
+      throw new Error("startDate debe ser menor que endDate");
+  }
+  if (resolution <= 0) {
+      throw new Error("resolution debe ser un número positivo");
   }
 
-  return [...data, ...res];
+  let res = [];
+  let currentDate = startDate;
+
+  for (let i = 0; i < data.length; i++) {
+      // Llenar los intervalos faltantes
+      while (currentDate < data[i].date) {
+          res.push({ date: currentDate, value: null });
+          currentDate += resolution;
+      }
+
+      res.push(data[i]);
+      currentDate = data[i].date + resolution;
+  }
+
+  // Llenar hasta el endDate
+  while (currentDate <= endDate) {
+      res.push({ date: currentDate, value: null });
+      currentDate += resolution;
+  }
+
+  return res;
 }

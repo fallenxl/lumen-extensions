@@ -29,33 +29,93 @@
     <!-- is on -->
     <div
       id="is-on"
-      class="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-blue-500 to-blue-400 rounded-lg opacity-40"
+      class="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-blue-500 to-blue-400 rounded-lg opacity-40 z-10"
     ></div>
     <!-- is off -->
     <div
       id="is-off"
-      class="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-gray-500 to-gray-400 rounded-lg opacity-40"
+      class="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-gray-500 to-gray-400 rounded-lg opacity-40 z-10"
     ></div>
-    <div
+    <!-- <div
       id="is-loaded-bg"
       class="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-gray-100 to-gray-300 rounded-lg opacity-40 hidden"
-    ></div>
+    ></div> -->
+    <div *ngIf="isModalOpen" class="absolute top-0 left-0 w-full h-full flex items-center justify-center rounded-lg py-6 z-20 " style="background-color: rgba(0, 0, 0, 0.5);">
+      <div class="bg-white rounded shadow-lg w-5/6  h-full overflow-auto ">
+          <!-- Header -->
+          <div class="py-4 px-6 border-b">
+              <p class="text-sm font-medium text-gray-700">Set Manually</p>
+          </div>
+          <!-- Body -->
+          <div class="py-4 px-6">
+              <div class="mb-4">
+                  <label class="block text-sm font-medium text-gray-700 mb-1" for="temperature"> Set Temperature</label>
+                  <input type="number" min="10" max="28" class="w-full border rounded px-3 py-2 text-gray-700 outline-none" name="temperatureTarget"
+                  (change)="handleInputChange($event)"
+                  [value]="updateData.temperatureTarget.value">
+                  <small class="text-gray-500 text-xs">*Set temperature between 10 and 28</small>
+              </div>
+              <div class="mb-4">
+                  <label class="block text-sm font-medium text-gray-700 mb-1" for="temperatureControlMode">Temperature Control Mode</label>
+                  <select class="w-full border rounded px-3 py-2 text-gray-700 outline-none" name="fanMode"[value]="updateData.fanMode.value"  (change)="handleInputChange($event)">
+                      <option value="auto">Auto</option>
+                      <option value="on">On</option>
+                      <option value="circulate">Circulate</option>
+                  </select>
+              </div>
+              <div class="mb-4">
+                  <label class="block text-sm font-medium text-gray-700 mb-1" for="fanMode">Fan Mode</label>
+                  <select 
+                  name="temperatureControlMode"
+                  (change)="handleInputChange($event)"
+                  class="w-full border rounded px-3 py-2 text-gray-700 outline-none"
+                   [value]="updateData.temperatureControlMode.value">
+                      <option value="heat">Heat</option>
+                      <option value="em heat">Em Heat</option>
+                      <option value="cool">Cool</option>
+                      <option value="auto">Auto</option>
+                  </select>
+              </div>
+          </div>
+          <!-- Footer -->
+          <div class="py-4 px-6 border-t flex justify-end">
+              <button class="bg-gray-400 text-white px-4 py-2 rounded mr-2" (click)="cancel()">Cancel</button>
+              <button class="bg-blue-600 text-white px-4 py-2 rounded" (click)="confirm()">Confirm</button>
+          </div>
+      </div>
+    </div>
 
     <div class="flex flex-col justify-between items-center h-full text-black">
       <div
-        class="flex items-center justify-end border-b py-2 w-full gap-4"
+        class="flex items-center justify-between border-b py-2 w-full gap-4"
         style="height: 10%"
+        [ngClass]="{ 'hidden': thermostatData.systemStatus.value === 'off' }"
       >
-        <lucide-angular
-          name="wifi"
-          class="my-icon text-gray-500"
-        ></lucide-angular>
+        <!-- time -->
+
+        <span class="text-2xl font-medium thermostat" id="clock"></span>
+        <div class="flex items-center gap-4">
+          <lucide-angular
+            name="wifi"
+            class="w-5 h-5 text-gray-500"
+          ></lucide-angular>
+         
+        </div>
       </div>
-      <div class="flex items-center justify-center" style="height: 70%">
-        <p class="thermostat temperature" id="tmp">{{ temperature }}</p>
+      <div class="flex items-center justify-center relative"
+      [ngStyle]="{ 'height': thermostatData.systemStatus.value === 'off' ? '100%' : '70%' }">
+      <div class="loading-container hidden" id="is-loaded">
+        <p class="text-xs font-medium">Setting<span class="dots"></span></p>
+      </div>
+      <div class="loading-container flex-col items-center justify-center w-full" *ngIf="isError">
+        <p class="text-xs font-medium text-red-500">{{errorMessage}}</p>
+      </div>
+        <p class="thermostat temperature" >{{ thermostatData.temperature.value }}</p>
         <div class="flex flex-col items-center justify-center h-1/2 mt-5">
           <span class="text-sm font-bold">Hum.</span>
-          <span class="text-xs font-medium" id="humidity"></span>
+          <span class="text-xs font-medium" >
+            {{ thermostatData.humidity.value }}%
+          </span>
         </div>
       </div>
       <div
@@ -66,7 +126,7 @@
         <div class="px-4 text-center">
           <p class="text-sm font-bold">MODE</p>
           <p class="text-xs font-medium" id="fan-mode">
-            {{ thermostatData.fanMode.value }}
+            {{ capitalizeFirstLetter(thermostatData.temperatureControlMode.value) }}
           </p>
         </div>
         <div
@@ -80,11 +140,11 @@
         <div class="px-4 text-center">
           <p class="text-sm font-bold">FAN</p>
           <p class="text-xs font-medium" id="fan-status">
-            {{ thermostatData.fanStatus.value }}
+            {{ capitalizeFirstLetter(thermostatData.fanMode.value) }}
           </p>
         </div>
       </div>
-      <span class="loader mt-2 hidden" id="is-loaded"></span>
+      <!-- <span class="loader mt-2 hidden" id="is-loaded"></span> -->
     </div>
   </div>
   <!-- Botones -->
@@ -95,6 +155,7 @@
     <button
       (click)="togglePower()"
       class="bg-gray-300 hover:bg-gray-200 p-4 rounded-full focus:outline-none"
+      [disabled]="blockedButtons"
     >
       <lucide-angular
         name="power"
@@ -103,6 +164,7 @@
     </button>
     <button
       (click)="increaseTemperature()"
+      [disabled]="blockedButtons"
       class="bg-gray-200 hover:bg-gray-300 p-4 rounded-full focus:outline-none"
     >
       <lucide-angular
@@ -112,6 +174,7 @@
     </button>
     <button
       (click)="decreaseTemperature()"
+      [disabled]="blockedButtons"
       class="bg-gray-200 hover:bg-gray-300 p-4 rounded-full focus:outline-none"
     >
       <lucide-angular
@@ -120,13 +183,8 @@
       ></lucide-angular>
     </button>
     <button
-      (click)="decreaseTemperature()"
-      class="bg-gray-200 hover:bg-gray-300 p-4 rounded-full focus:outline-none"
-    >
-      <lucide-angular name="fan" class="my-icon text-gray-500"></lucide-angular>
-    </button>
-    <button
-      (click)="decreaseTemperature()"
+      (click)="toggleModal()"
+      [disabled]="blockedButtons"
       class="bg-gray-200 hover:bg-gray-300 p-4 rounded-full focus:outline-none"
     >
       <lucide-angular
@@ -135,13 +193,20 @@
       ></lucide-angular>
     </button>
   </div>
+
 </div>
 <div
   *ngIf="!isValid"
   class="bg-white rounded-lg shadow-lg p-6 w-full h-full flex flex-col items-center justify-center"
 >
   <p class="text-red-500 text-sm">Invalid configuration</p>
-  <small class="text-gray-500 text-xs">Please check the configuration 
-    <a href="https://thingsboard.io/docs/user-guide/ui/widgets/thermostat-control/" class="text-blue-500" target="_blank">here</a>
+  <small class="text-gray-500 text-xs"
+    >Please check the configuration
+    <a
+      href="https://thingsboard.io/docs/user-guide/ui/widgets/thermostat-control/"
+      class="text-blue-500"
+      target="_blank"
+      >here</a
+    >
   </small>
 </div>

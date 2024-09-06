@@ -6,8 +6,8 @@ import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { SharedModule } from '@shared/public-api';
 import { EMSChartComponent } from './emsc.component';
-import { ButtonModule } from 'primeng/button';
-import { AccordionModule } from 'primeng/accordion';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 
 @NgModule({
   declarations: [
@@ -16,8 +16,8 @@ import { AccordionModule } from 'primeng/accordion';
   imports: [
     CommonModule,
     SharedModule,
-    ButtonModule,
-    AccordionModule
+    MatFormFieldModule,
+    MatDatepickerModule
   ],
   exports: [
     EMSChartComponent

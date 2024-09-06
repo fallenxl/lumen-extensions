@@ -1,0 +1,54 @@
+<!--
+
+    Copyright © 2023 ThingsBoard, Inc.
+
+-->
+
+<link
+  rel="stylesheet"
+  href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css"
+  integrity="sha512-wnea99uKIC3TJF7v4eKk4Y+lMz2Mklv18+r4na2Gn1abDRPPOeef95xTzdwGD9e6zXJBteMIhZ1+68QC5byJZw=="
+  crossorigin="anonymous"
+  referrerpolicy="no-referrer"
+/>
+<!-- import lc.component.css -->
+
+<div *ngIf="isValid" class="flex flex-col h-full text-black px-10">
+  <!-- header -->
+  <div class="flex flex-col items-center justify-center py-2 w-full">
+    <h4>Light Control</h4>
+    <small> Control the light in your room by turning it on or off. </small>
+  </div>
+  <div class="flex justify-center gap-4">
+    <button
+      class="bg-gray-200 text-gray-500 px-4 py-2 rounded shadow-md flex-grow hover:bg-gray-300"
+      (click)="turnOffAll()"
+    >
+      Turn Off All
+    </button>
+    <button
+      class="bg-gray-100 text-gray-500 px-4 py-2 rounded shadow-md flex-grow hover:bg-gray-200"
+      (click)="turnOnAll()"
+    >
+      Turn On All
+    </button>
+  </div>
+  <div id="switch-container" class="grid grid-cols-4 gap-4 py-5 justify-center items-center h-full">
+    <div *ngFor="let index of switches; let i = index" class="flex flex-col items-center justify-center gap-2">
+      <div 
+        name="switch"
+        (click)="toggleSwitches(i, getSwitchState(i) === 'on' ? 'off' : 'on')"
+        aria-checked="{{ getSwitchState(i) === 'on' }}"
+        class="flex items-center justify-center p-2 rounded cursor-pointer {{ getSwitchState(i) === 'on' ? 'bg-yellow-300 glow' : 'bg-gray-200' }} {{ isSelected(i) ? 'border-2 border-blue-500' : '' }}"
+      >
+        <img width="30" height="30" [src]="getSwitchState(i) === 'on' ? 'https://img.icons8.com/ios-filled/50/light-on.png' : 'https://img.icons8.com/wired/64/light-off.png'" [alt]="getSwitchState(i) === 'on' ? 'light-on' : 'light-off'"/>
+      </div>
+      <label class="font-medium text-sm">{{ ctx.$scope.data[i].dataKey.label }}</label>
+    </div>
+  </div>
+</div>
+
+<div *ngIf="!isValid" class="flex flex-col items-center justify-center h-full">
+  <h4>Light Control</h4>
+  <small> No data available. </small>
+</div>

@@ -16,6 +16,8 @@ import am5themes_Responsive from "@amcharts/amcharts5/themes/Responsive";
 
 import { customColors } from './constants/colors';
 import { Router } from '@angular/router';
+import { Subject, takeUntil } from 'rxjs';
+import { MatCalendarCellClassFunction } from '@angular/material/datepicker';
 
 
 
@@ -27,10 +29,22 @@ import { Router } from '@angular/router';
 })
 export class EMSChartComponent implements OnInit, OnDestroy {
   @Input() ctx: WidgetContext;
+  dateClass: MatCalendarCellClassFunction<Date> = (cellDate, view) => {
+    const date = cellDate.getDate();
+    //selected range start date
+    if (this.customStartDate) {
+      const startDate = new Date(this.customStartDate);
+      if (cellDate.toDateString() === startDate.toDateString()) {
+        return 'bg-gray-200';
+      }
+    }
+
+    return '';
+  };
 
   private root: am5.Root | null = null;
   private legendRoot: am5.Root | null = null;
-
+  private destroy$ = new Subject<void>();
   summaryTableType: "summary" | "individual" = "summary";
 
   summaryData = []
@@ -62,6 +76,8 @@ export class EMSChartComponent implements OnInit, OnDestroy {
     resolution: true,
   };
 
+  customStartDate: Date
+  customEndDate: Date
 
   fieldsSelected: string[] = [];
   updateFieldsSelected: string[] = [];
@@ -106,9 +122,8 @@ export class EMSChartComponent implements OnInit, OnDestroy {
     if (this.root) {
       this.root.dispose();
     }
-    if (this.subscriptions) {
-      console.log(this.subscriptions, 'unsubscribe')
-    }
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   initialize() {
@@ -120,10 +135,9 @@ export class EMSChartComponent implements OnInit, OnDestroy {
         },
         toName: datasource.entityName,
         label: datasource.entityName,
-        relations: [],
+        relations: []
       };
       this.entityRelations.push(parentRelation);
-      const url = new URLSearchParams(window.location.search);
       this.getEntityRelations(datasource.entity.id, parentRelation.relations);
     });
 
@@ -200,7 +214,14 @@ export class EMSChartComponent implements OnInit, OnDestroy {
     if (!this.selectedAssets.includes(asset)) {
       this.selectedAssets.push(asset);
       this.assetDevices[asset.to.id] = asset.relations;
+      // add default devices to selectedDeviceIds
+      const defaultDevices = asset.relations.filter((relation) => relation.isDefault);
+      this.selectedDeviceIds = this.selectedDeviceIds.concat(defaultDevices);
+
       asset.expanded = true;
+      if (defaultDevices.length > 0) {
+        this.updateChart();
+      }
     } else {
       this.selectedAssets = this.selectedAssets.filter((selectedAsset) => selectedAsset !== asset);
 
@@ -241,27 +262,40 @@ export class EMSChartComponent implements OnInit, OnDestroy {
   }
 
   getEntityRelations(entityId: EntityId, parentRelation: EntityRelation[] = this.entityRelations) {
-    this.subscriptions = this.ctx.entityRelationService.findInfoByFrom(entityId).subscribe((entityRelations) => {
-      if (entityRelations.length > 0) {
-        entityRelations.forEach((relation) => {
-          const subscribing = this.ctx.entityService.getEntity(relation.to.entityType as EntityType, relation.to.id).subscribe((device) => {
-            let newRelation: EntityRelation = {
-              to: {
-                entityType: relation.to.entityType,
-                id: relation.to.id
-              },
-              toName: relation.toName,
-              label: device.label,
-              relations: [],
-              expanded: false
-            };
-            parentRelation.push(newRelation);
-            this.getEntityRelations(relation.to, newRelation.relations);
-          })
-        });
-      }
+    this.subscriptions = this.ctx.entityRelationService.findInfoByFrom(entityId)
+      .pipe(
+        takeUntil(this.destroy$)
+      )
+      .subscribe((entityRelations) => {
+        if (entityRelations.length > 0) {
+          entityRelations.forEach((relation) => {
+            const name = relation.toName.split(" ");
+            const fromEntityType = relation.from.entityType;
+            if (name.includes('EMS') || fromEntityType !== 'CUSTOMER') {
+              this.ctx.entityService.getEntity(relation.to.entityType as EntityType, relation.to.id)
+                .pipe(
+                  takeUntil(this.destroy$)
+                )
+                .subscribe((device) => {
+                  let newRelation: EntityRelation = {
+                    to: {
+                      entityType: relation.to.entityType,
+                      id: relation.to.id
+                    },
+                    toName: name.filter((item) => item !== 'EMS').join(" "),
+                    label: device.label?.split(",")[0],
+                    isDefault: device.label?.split(",")[1] === 'default' ? true : false,
+                    relations: [],
+                    expanded: false
+                  };
+                  parentRelation.push(newRelation);
+                  this.getEntityRelations(relation.to, newRelation.relations);
+                })
+            }
+          });
+        }
 
-    }).remove(this.subscriptions);
+      })
   }
 
   isSelected(id: EntityId) {
@@ -277,346 +311,367 @@ export class EMSChartComponent implements OnInit, OnDestroy {
     }
   }
 
-  getSummaryData() {
-    // this.ctx.detectChanges();
-    return this.summaryData;
-  }
+
   ChartXY(data: any, summaryData = this.summaryData) {
 
-    this.root = am5.Root.new("chartdiv");
-    this.legendRoot = am5.Root.new("legenddiv");
-    
-    am5.ready(() => {
-      var root = this.root;
-      let tempSummaryData = [];
-      var legendRoot = this.legendRoot;
-      legendRoot.setThemes([
-        am5themes_Animated.new(legendRoot),
-        am5xy.DefaultTheme.new(legendRoot)
-      ]);
-      var chart = root.container.children.push(
-        am5xy.XYChart.new(root, {
-          panY: false,
-          wheelY: "zoomX",
-          layout: root.verticalLayout,
+    try {
+      this.root = am5.Root.new("chartdiv");
+      this.legendRoot = am5.Root.new("legenddiv");
 
-        })
-      );
-
-      chart.get('colors').set("colors", customColors)
-      var xAxis = chart.xAxes.push(
-        am5xy.GaplessDateAxis.new(root, {
-
-          baseInterval: { timeUnit: this.resolutionSelected.agg as TimeUnit, count: 1 },
-          minZoomCount: this.intervalSelected.minZoom,
-          renderer: am5xy.AxisRendererX.new(root, {
-            // minGridDistance: this.intervalSelected.minGrid,
-            strokeOpacity: 1,
-            opacity: 1,
-          }),
-          tooltip: am5.Tooltip.new(root, {
-          })
-        })
-      );
-
-
-      xAxis.get("renderer").ticks.template.setAll({
-        inside: false,
-        visible: true,
-
-      });
-
-
-      var startEndChangeTimeout;
-      xAxis.on("end", handleStartEndChange);
-      xAxis.on("start", handleStartEndChange);
-
-      function handleStartEndChange() {
-
-        clearTimeout(startEndChangeTimeout);
-
-        startEndChangeTimeout = setTimeout(function () {
-          zoomEnded();
-        }, 50);
-      }
-
-      const updateChart = this.updateSummaryTable.bind(this);
-      function zoomEnded() {
-        summaryData = tempSummaryData.map((item) => {
-          let data = item.data.filter((item) => new Date(item.date).getTime() >= new Date(xAxis.getPrivate("selectionMin")).getTime() && new Date(item.date).getTime() <= new Date(xAxis.getPrivate("selectionMax")).getTime());
-          return { ...item, intervalData: data }
-        });
-
-
-        updateChart(summaryData);
-      }
-      xAxis.get("dateFormats")["day"] = "MM/dd";
-      xAxis.get("periodChangeDateFormats")["day"] = "MMMM";
-
-
-      var scrollbarX = am5xy.XYChartScrollbar.new(root, {
-        orientation: "horizontal",
-        height: 30
-      });
-      var sbxAxis = scrollbarX.chart.xAxes.push(
-        am5xy.DateAxis.new(root, {
-
-          baseInterval: { timeUnit: this.resolutionSelected.agg as TimeUnit, count: 1 },
-          renderer: am5xy.AxisRendererX.new(root, {
-            opposite: false,
-            strokeOpacity: 0,
-            opacity: 0,
-          })
-        })
-      );
-
-      sbxAxis.hide();
-
-      var sbyAxis = scrollbarX.chart.yAxes.push(
-        am5xy.ValueAxis.new(root, {
-          renderer: am5xy.AxisRendererY.new(root, {})
-        })
-      );
-
-
-      let yAxisUnit = [];
-      let phaseSelected = this.phaseTypeSelected;
-      let currentColor;
-      // Encontrar el número negativo más alto
-      const findLowestNegative = (arr) => {
-        return arr.reduce((lowest, item) => {
-          if (item.value < 0 && (lowest === null || item.value < lowest)) {
-            return item.value;
-          }
-          return lowest;
-        }, null);
-      };
-
-      // Encontrar el valor negativo más bajo en todos los conjuntos de datos
-      let overallLowestNegative = null;
-
-      data.forEach(dataset => {
-        // Encontrar las keys que contienen datos
-        const dataKey = Object.keys(dataset).find(key => Array.isArray(dataset[key]));
-
-        if (dataKey) {
-          const lowestNegative = findLowestNegative(dataset[dataKey]);
-          if (lowestNegative !== null && (overallLowestNegative === null || lowestNegative < overallLowestNegative)) {
-            overallLowestNegative = lowestNegative;
-          }
-        }
-      });
-      const syncAxis = this.isEnergySelected
-      // Configurar el eje Y basado en el valor negativo más bajo encontrado
-      const yAxisMin = overallLowestNegative !== null ? overallLowestNegative * 2 : 0;
-      function createSeries(name, field, data, t, unit, key) {
-        if (!unit) {
-          unit = '';
-        }
-        // Verificar si el eje para la unidad ya existe
-        let yAxisIndex = yAxisUnit.indexOf(unit);
-        let yAxis;
-
-        if (yAxisIndex === -1) {
-          // Si no existe, crear uno nuevo
-          yAxis = chart.yAxes.push(am5xy.ValueAxis.new(root, {
-
-            numberFormat: unit === '%' ? '# .0%' : '##.## ' + unit,
-            strictMinMax: false,
-            renderer: am5xy.AxisRendererY.new(root, {
-              opposite: t === 'line',
-              strokeOpacity: 1,
-              opacity: 1,
-              stroke: am5.color("rgba(0,0,0,0.1)"),
-            }),
-          }))
-          yAxisUnit.push(unit);
-        } else {
-          // Si ya existe, reutilizar el existente
-          yAxis = chart.yAxes.getIndex(yAxisIndex);
-        }
-
-
-
-        var tooltip = am5.Tooltip.new(root, {
-          getFillFromSprite: false,
-          getStrokeFromSprite: true,
-          autoTextColor: false,
-          getLabelFillFromSprite: true,
-          labelText: phaseSelected === "System" ? "[bold]{name}[/]:[thin] {valueY}" + unit + "[/]" : "[bold]{name}: [thin] {valueY}" + unit + "[/]",
-          draggable: true,
-          animationDuration: 100,
-          pointerOrientation: "horizontal",
-          animationEasing: am5.ease.linear,
-
-        });
-
-        tooltip.get("background").setAll({
-          fill: am5.color(0xffffff),
-          fillOpacity: 0.8
-        });
-        // sincronizar el 
-
-        if (syncAxis) {
-          yAxis.set("syncWithAxis", chart.yAxes.getIndex(0));
-        }
-
-
-        if (t.toLowerCase() === 'line') {
-
-          yAxis.set('min', yAxisMin);
-          var series = chart.series.push(
-            am5xy.LineSeries.new(root, {
-              name: phaseSelected === "System" ? name : name + '-' + key.slice(0, 2),
-              xAxis: xAxis,
-              yAxis: yAxis,
-              valueYField: field,
-              valueXField: "date",
-              layer: 10,
-              tooltip: tooltip,
-            })
-          );
-
-
-
-          let sbSeries = scrollbarX.chart.series.push(
-            am5xy.LineSeries.new(root, {
-              xAxis: sbxAxis,
-              yAxis: sbyAxis,
-              valueYField: field,
-              valueXField: "date",
+      am5.ready(() => {
+        try {
+          var root = this.root;
+          let tempSummaryData = [];
+          var legendRoot = this.legendRoot;
+          legendRoot.setThemes([
+            am5themes_Animated.new(legendRoot),
+            am5xy.DefaultTheme.new(legendRoot)
+          ]);
+          var chart = root.container.children.push(
+            am5xy.XYChart.new(root, {
+              panY: false,
+              wheelY: "zoomX",
+              layout: root.verticalLayout,
 
             })
           );
 
+          chart.get('colors').set("colors", customColors)
+          var xAxis = chart.xAxes.push(
+            am5xy.GaplessDateAxis.new(root, {
 
-          sbSeries.data.setAll(data);
-          yAxis.get("renderer").labels.template.set("text", "{value} " + unit);
-          yAxis.get("renderer").labels.template.set("fontSize", 10);
-          // yAxis.get("renderer").labels.template.set("fill", 'rgba(0,0,0,0.8)');
-          yAxis.get("renderer").grid.template.set("forceHidden", true);
-          yAxis.get("renderer").grid.template.set("strokeOpacity", 0.07);
-          yAxis.get("renderer").ticks.template.setAll({
-            inside: false,
-            visible: true,
-            fill: am5.color("rgba(0,0,0,0.5)"),
-
-          })
-          //Bullets Line Series
-          // series.bullets.push(() => {
-          //   return am5.Bullet.new(root, {
-          //     sprite: am5.Circle.new(root, {
-          //       radius: 2,
-          //       fill: series.get("fill"),
-          //     })
-          //   });
-          // })
-
-          series.strokes.template.set("strokeWidth", 1.5);
-          series.data.setAll(data);
-          currentColor = series.get("fill").toCSS();
-        } else if (t.toLowerCase() === 'bar') {
-          yAxis.set('min', 0);
-          var barSeries = chart.series.push(
-            am5xy.ColumnSeries.new(root, {
-              name: phaseSelected === "System" ? name : name + '-' + key.slice(0, 2),
-              xAxis: xAxis,
-              stacked: key.includes('Edelta'),
-              yAxis: yAxis,
-              valueYField: field,
-              valueXField: "date",
-              clustered: false,
-              tooltip: tooltip
-            })
-          );
-
-          let sbSeries = scrollbarX.chart.series.push(
-            am5xy.ColumnSeries.new(root, {
-              xAxis: sbxAxis,
-              yAxis: sbyAxis,
-              valueYField: field,
-              valueXField: "date",
-              stacked: true,
+              baseInterval: { timeUnit: this.resolutionSelected.agg as TimeUnit, count: 1 },
+              minZoomCount: this.intervalSelected.minZoom,
+              renderer: am5xy.AxisRendererX.new(root, {
+                // minGridDistance: this.intervalSelected.minGrid,
+                strokeOpacity: 1,
+                opacity: 1,
+              }),
+              tooltip: am5.Tooltip.new(root, {
+              })
             })
           );
 
 
-
-          sbSeries.data.setAll(data);
-
-
-          yAxis.get("renderer").grid.template.set("forceHidden", true);
-          yAxis.get("renderer").labels.template.set("text", "{value} " + unit);
-          yAxis.get("renderer").labels.template.set("fontSize", 10);
-          yAxis.get("renderer").ticks.template.setAll({
+          xAxis.get("renderer").ticks.template.setAll({
             inside: false,
             visible: true,
 
-          })
-          barSeries.data.setAll(data);
-          currentColor = barSeries.get("fill").toCSS();
-        }
-
-      }
+          });
 
 
+          var startEndChangeTimeout;
+          xAxis.on("end", handleStartEndChange);
+          xAxis.on("start", handleStartEndChange);
 
-      data.forEach((key) => {
+          function handleStartEndChange() {
 
-        Object.keys(key).forEach((item) => {
-          if (item === 'chartType' || item === 'unit' || item === 'name' || item === 'color' || item === 'getTotal') return
-          let parsedData = key[item]?.map((item) => {
-            return {
-              date: new Date(item.ts).getTime(),
-              value: Math.round(item.value * 100) / 100
+            clearTimeout(startEndChangeTimeout);
+
+            startEndChangeTimeout = setTimeout(function () {
+              zoomEnded();
+            }, 200);
+          }
+
+          const updateChart = this.updateSummaryTable.bind(this);
+          function zoomEnded() {
+            summaryData = tempSummaryData.map((item) => {
+              let data = item.data.filter((item) => new Date(item.date).getTime() >= new Date(xAxis.getPrivate("selectionMin")).getTime() && new Date(item.date).getTime() <= new Date(xAxis.getPrivate("selectionMax")).getTime());
+              return { ...item, intervalData: data }
+            });
+
+
+            updateChart(summaryData);
+          }
+          xAxis.get("dateFormats")["day"] = "MM/dd";
+          xAxis.get("periodChangeDateFormats")["day"] = "MMMM";
+
+
+          var scrollbarX = am5xy.XYChartScrollbar.new(root, {
+            orientation: "horizontal",
+            height: 30
+          });
+          var sbxAxis = scrollbarX.chart.xAxes.push(
+            am5xy.DateAxis.new(root, {
+
+              baseInterval: { timeUnit: this.resolutionSelected.agg as TimeUnit, count: 1 },
+              renderer: am5xy.AxisRendererX.new(root, {
+                opposite: false,
+                strokeOpacity: 0,
+                opacity: 0,
+              })
+            })
+          );
+
+          sbxAxis.hide();
+
+          var sbyAxis = scrollbarX.chart.yAxes.push(
+            am5xy.ValueAxis.new(root, {
+              renderer: am5xy.AxisRendererY.new(root, {})
+            })
+          );
+
+
+          let yAxisUnit = [];
+          let phaseSelected = this.phaseTypeSelected;
+          let currentColor;
+          // Encontrar el número negativo más alto
+          const findLowestNegative = (arr) => {
+            return arr.reduce((lowest, item) => {
+              if (item.value < 0 && (lowest === null || item.value < lowest)) {
+                return item.value;
+              }
+              return lowest;
+            }, null);
+          };
+
+          // Encontrar el valor negativo más bajo en todos los conjuntos de datos
+          let overallLowestNegative = null;
+
+          data.forEach(dataset => {
+            // Encontrar las keys que contienen datos
+            const dataKey = Object.keys(dataset).find(key => Array.isArray(dataset[key]));
+
+            if (dataKey) {
+              const lowestNegative = findLowestNegative(dataset[dataKey]);
+              if (lowestNegative !== null && (overallLowestNegative === null || lowestNegative < overallLowestNegative)) {
+                overallLowestNegative = lowestNegative;
+              }
             }
-          })
+          });
+          const syncAxis = this.isEnergySelected
+          // Configurar el eje Y basado en el valor negativo más bajo encontrado
+          const yAxisMin = overallLowestNegative !== null ? overallLowestNegative * 2 : 0;
+          function createSeries(name, field, data, t, unit, key) {
+            try {
+              if (!unit) {
+                unit = '';
+              }
+              // Verificar si el eje para la unidad ya existe
+              let yAxisIndex = yAxisUnit.indexOf(unit);
+              let yAxis;
 
-          if (this.resolutionSelected.name === '1 minute') {
-            parsedData = parsedData.reverse()
-          } else if (this.resolutionSelected.name === '2 minutes') {
-            parsedData = parsedData.reverse()
+              if (yAxisIndex === -1) {
+                // Si no existe, crear uno nuevo
+                yAxis = chart.yAxes.push(am5xy.ValueAxis.new(root, {
+
+                  numberFormat: unit === '%' ? '# .0%' : '##.## ' + unit,
+                  strictMinMax: false,
+                  renderer: am5xy.AxisRendererY.new(root, {
+                    opposite: t === 'line',
+                    strokeOpacity: 1,
+                    opacity: 1,
+                    stroke: am5.color("rgba(0,0,0,0.1)"),
+                  }),
+                }))
+                yAxisUnit.push(unit);
+              } else {
+                // Si ya existe, reutilizar el existente
+                yAxis = chart.yAxes.getIndex(yAxisIndex);
+              }
+
+
+
+              var tooltip = am5.Tooltip.new(root, {
+                getFillFromSprite: false,
+                getStrokeFromSprite: true,
+                autoTextColor: false,
+                getLabelFillFromSprite: true,
+                labelText: phaseSelected === "System" ? "[bold]{name}[/]:[thin] {valueY}" + unit + "[/]" : "[bold]{name}: [thin] {valueY}" + unit + "[/]",
+                draggable: true,
+                animationDuration: 100,
+                pointerOrientation: "horizontal",
+                animationEasing: am5.ease.linear,
+
+              });
+
+              tooltip.get("background").setAll({
+                fill: am5.color(0xffffff),
+                fillOpacity: 0.8
+              });
+              // sincronizar el 
+
+              if (syncAxis) {
+                yAxis.set("syncWithAxis", chart.yAxes.getIndex(0));
+              }
+
+
+              if (t.toLowerCase() === 'line') {
+
+                yAxis.set('min', yAxisMin);
+                var series = chart.series.push(
+                  am5xy.LineSeries.new(root, {
+                    name: phaseSelected === "System" ? name : name + '-' + key.slice(0, 2),
+                    xAxis: xAxis,
+                    yAxis: yAxis,
+                    valueYField: field,
+                    valueXField: "date",
+                    layer: 10,
+                    tooltip: tooltip,
+                  })
+                );
+
+
+
+                let sbSeries = scrollbarX.chart.series.push(
+                  am5xy.LineSeries.new(root, {
+                    xAxis: sbxAxis,
+                    yAxis: sbyAxis,
+                    valueYField: field,
+                    valueXField: "date",
+
+                  })
+                );
+
+
+                sbSeries.data.setAll(data);
+                yAxis.get("renderer").labels.template.set("text", "{value} " + unit);
+                yAxis.get("renderer").labels.template.set("fontSize", 10);
+                // yAxis.get("renderer").labels.template.set("fill", 'rgba(0,0,0,0.8)');
+                yAxis.get("renderer").grid.template.set("forceHidden", true);
+                yAxis.get("renderer").grid.template.set("strokeOpacity", 0.07);
+                yAxis.get("renderer").ticks.template.setAll({
+                  inside: false,
+                  visible: true,
+                  fill: am5.color("rgba(0,0,0,0.5)"),
+
+                })
+
+
+                series.strokes.template.set("strokeWidth", 1.5);
+                series.data.setAll(data);
+                currentColor = series.get("fill").toCSS();
+              } else if (t.toLowerCase() === 'bar') {
+                yAxis.set('min', 0);
+                var barSeries = chart.series.push(
+                  am5xy.ColumnSeries.new(root, {
+                    name: phaseSelected === "System" ? name : name + '-' + key.slice(0, 2),
+                    xAxis: xAxis,
+                    stacked: true,
+                    yAxis: yAxis,
+                    valueYField: "value",
+                    valueXField: "date",
+                    tooltip: tooltip
+                  })
+                );
+
+                let sbSeries = scrollbarX.chart.series.push(
+                  am5xy.ColumnSeries.new(root, {
+                    xAxis: sbxAxis,
+                    yAxis: sbyAxis,
+                    valueYField: "value",
+                    valueXField: "date",
+                    stacked: true,
+                  })
+                );
+
+
+
+                sbSeries.data.setAll(data);
+
+
+                yAxis.get("renderer").grid.template.set("forceHidden", true);
+                yAxis.get("renderer").labels.template.set("text", "{value} " + unit);
+                yAxis.get("renderer").labels.template.set("fontSize", 10);
+                yAxis.get("renderer").ticks.template.setAll({
+                  inside: false,
+                  visible: true,
+
+                })
+                console.log('data', data)
+                barSeries.data.setAll(data);
+                currentColor = barSeries.get("fill").toCSS();
+              }
+            } catch (error) {
+              console.log(error)
+              this.isAlert = 'Error fetching data, please try again';
+              this.toggleIsLoading(false);
+
+            }
+
           }
-          if (this.intervalSelected.fillData) {
-            parsedData = fillData(parsedData, this.intervalSelected.endDate, this.resolutionSelected.ts)
+
+
+
+
+
+          let cursor = chart.set("cursor", am5xy.XYCursor.new(root, {
+            behavior: "zoomX",
+            xAxis: xAxis,
+          }));
+
+          cursor.lineY.set("visible", false);
+
+          chart.set("scrollbarX", scrollbarX);
+
+          const legend = chart.children.push(am5.Legend.new(root, {
+            paddingTop: 20,
+          }));
+
+
+          data.forEach((key) => {
+
+            Object.keys(key).forEach((item) => {
+              if (item === 'chartType' || item === 'unit' || item === 'name' || item === 'color' || item === 'getTotal') return
+              let parsedData = key[item]?.map((item) => {
+                return {
+                  date: new Date(item.ts).getTime(),
+                  value: Math.round(parseFloat(item.value) * 100) / 100
+                }
+              })
+
+              console.log(item)
+
+              if (this.resolutionSelected.name === '1 minute') {
+                parsedData = parsedData.reverse()
+              } else if (this.resolutionSelected.name === '2 minutes') {
+                parsedData = parsedData.reverse()
+              }
+              if (this.intervalSelected.fillData) {
+                parsedData = fillData(parsedData, this.intervalSelected.startDate, this.intervalSelected.endDate, this.resolutionSelected.ts)
+              }
+              let keyLabel = key.name?.split(" ")
+
+              createSeries(key.name, 'value', parsedData, key.chartType, key.unit, item);
+              tempSummaryData.push({ name: key.name, data: parsedData, key: item, field: keyLabel[keyLabel.length - 1], intervalData: parsedData, unit: key.unit, color: currentColor, getTotal: key.chartType === 'bar' ? true : false })
+            });
+
+          });
+
+          try {
+            // let legend = legendRoot.container.children.push(am5.Legend.new(legendRoot, {
+            //   layout: legendRoot.gridLayout,
+            // }))
+
+            legend.data.setAll(chart.series.values);
+            legend.events.on("boundschanged", function () {
+              document.getElementById("legenddiv").style.height = legend.height() + "px"
+            });
           }
-          let keyLabel = key.name?.split(" ")
-          createSeries(key.name, 'value', parsedData, key.chartType, key.unit, item);
-          tempSummaryData.push({ name: key.name, data: parsedData, key: item, field: keyLabel[keyLabel.length - 1], intervalData: parsedData, unit: key.unit, color: currentColor, getTotal: key.chartType === 'bar' ? true : false })
-        });
+          catch (error) {
+            console.log(error)
+          }
+          summaryData = tempSummaryData;
+          this.updateSummaryTable(summaryData);
+          this.graph = root;
+          this.legendRoot = legendRoot;
+
+          this.toggleIsLoading(false);
+        } catch (error) {
+          console.log(error)
+          this.isAlert = 'Error fetching data, please try again';
+          this.toggleIsLoading(false);
+        }
+
+
 
       });
 
-      let cursor = chart.set("cursor", am5xy.XYCursor.new(root, {
-        behavior: "zoomX",
-        xAxis: xAxis,
-      }));
-
-      cursor.lineY.set("visible", false);
-
-      chart.set("scrollbarX", scrollbarX);
-
-      // const legend = chart.children.push(am5.Legend.new(root, {
-      //   paddingTop: 20,
-      // }));
-      let legend = legendRoot.container.children.push(am5.Legend.new(legendRoot, {
-        layout: legendRoot.gridLayout,
-      }))
-
-      legend.data.setAll(chart.series.values);
-      legend.events.on("boundschanged", function() {
-        document.getElementById("legenddiv").style.height = legend.height() + "px"
-      });
-      summaryData = tempSummaryData;
-      this.updateSummaryTable(summaryData);
-      this.graph = root;
-      this.legendRoot = legendRoot;
-
+      this.summaryData = summaryData;
+    } catch (error) {
+      this.isAlert = 'Error fetching data, please try again';
       this.toggleIsLoading(false);
-
-    });
-
-    this.summaryData = summaryData;
+    }
   }
 
   addDeviceId(device: EntityRelation) {
@@ -628,29 +683,45 @@ export class EMSChartComponent implements OnInit, OnDestroy {
     this.ctx.detectChanges();
 
   }
-  telemetryData = []
+
   updateChart() {
-    if (this.selectedKeys.length === 0) {
-      this.isError = 'No field selected';
-      return;
-    }
-    if (this.selectedDeviceIds.length === 0) {
-      this.isError = 'No device selected';
-      return;
-    }
-    this.toggleSidebar('close');
-    this.isError = '';
-    this.isUpdated = true;
-    const totalRequests = this.selectedDeviceIds.length * this.selectedKeys.length;
-    let completedRequests = 0;
-    this.telemetryData = []; // Reinicia telemetryData antes de comenzar
-    this.toggleIsLoading(true);
-    if (this.isEnergySelected && (this.resolutionSelected.name === '1 minute' || this.resolutionSelected.name === '2 minutes')) {
-      if (this.selectedKeys.some((key) => key.name === 'Energy')) {
-        this.isAlert = 'Energy field is not available for 1 minute and 2 minutes resolution';
-        this.resolutionSelected = this.resolutions.find((resolution) => resolution.id === this.intervalSelected.condition);
+    try {
+      if (this.selectedKeys.length === 0) {
+        this.isError = 'No field selected';
+        return;
+      }
+      if (this.selectedDeviceIds.length === 0) {
+        this.isError = 'No device selected';
+        return;
+      }
+      this.isAlert = '';
+      this.toggleSidebar('close');
+      this.isError = '';
+      this.isUpdated = true;
+      const totalRequests = this.selectedDeviceIds.length * this.selectedKeys.length;
+      let completedRequests = 0;
+      const telemetryData = []; // Reinicia telemetryData antes de comenzar
+      this.toggleIsLoading(true);
+      if (this.isEnergySelected && (this.resolutionSelected.name === '1 minute' || this.resolutionSelected.name === '2 minutes')) {
+        if (this.selectedKeys.some((key) => key.name === 'Energy')) {
+          this.isAlert = 'Energy field is not available for 1 minute and 2 minutes resolution';
+          this.resolutionSelected = this.resolutions.find((resolution) => resolution.id === this.intervalSelected.condition);
+          const radios = document.getElementsByName('resolution') as NodeListOf<HTMLInputElement>;
+          const findIndex = this.resolutions.findIndex((resolution) => resolution.id === this.intervalSelected.condition);
+          // disabled options below the default resolution
+          for (let i = 0; i < radios.length; i++) {
+            if (i < findIndex) {
+              radios[i].disabled = true;
+            } else {
+              radios[i].disabled = false;
+            }
+          }
+
+        }
+      } else {
+
         const radios = document.getElementsByName('resolution') as NodeListOf<HTMLInputElement>;
-        const findIndex = this.resolutions.findIndex((resolution) => resolution.id === this.intervalSelected.condition);
+        const findIndex = this.resolutions.findIndex((resolution) => resolution.id === this.intervalSelected.minResolution);
         // disabled options below the default resolution
         for (let i = 0; i < radios.length; i++) {
           if (i < findIndex) {
@@ -661,56 +732,47 @@ export class EMSChartComponent implements OnInit, OnDestroy {
         }
 
       }
-    } else {
 
-      const radios = document.getElementsByName('resolution') as NodeListOf<HTMLInputElement>;
-      const findIndex = this.resolutions.findIndex((resolution) => resolution.id === this.intervalSelected.minResolution);
-      // disabled options below the default resolution
-      for (let i = 0; i < radios.length; i++) {
-        if (i < findIndex) {
-          radios[i].disabled = true;
-        } else {
-          radios[i].disabled = false;
-        }
-      }
-
-    }
-    try {
       this.selectedDeviceIds.forEach((device, index) => {
         this.selectedKeys.forEach((key) => {
-          const subscribing = this.ctx.attributeService.getEntityTimeseries(device.to as EntityId, key.keys, this.intervalSelected.startDate, this.intervalSelected.endDate, 50000, this.resolutionSelected.aggType as AggregationType ?? key.agg as AggregationType, this.resolutionSelected.ts).subscribe((telemetry) => {
-            if (key.usePostProcessing) {
-              Object.keys(telemetry).forEach((item) => {
-                telemetry[item] = telemetry[item].map((data) => {
+          this.ctx.attributeService.getEntityTimeseries(device.to as EntityId, key.keys, this.intervalSelected.startDate, this.intervalSelected.endDate, 50000, this.resolutionSelected.aggType as AggregationType ?? key.agg as AggregationType, this.resolutionSelected.ts)
+            .pipe(
+              takeUntil(this.destroy$)
+            )
+            .subscribe((telemetry) => {
+              if (key.usePostProcessing) {
+                Object.keys(telemetry).forEach((item) => {
+                  telemetry[item] = telemetry[item].map((data) => {
 
-                  const postProcessing = new Function('value', key.postFuncBody);
-                  return {
-                    ts: data.ts,
-                    value: postProcessing(data.value)
-                  };
+                    const postProcessing = new Function('value', key.postFuncBody);
+                    return {
+                      ts: data.ts,
+                      value: parseFloat(postProcessing(data.value)).toFixed(2)
+                    };
+                  });
                 });
-              });
-            }
-            this.telemetryData.push({ ...telemetry, chartType: key.chartType, unit: key.unit, name: device.label + ' ' + key.name, color: key.color })
-            completedRequests++;
-            // Verifica si todas las solicitudes se han completado
-            if (completedRequests === totalRequests) {
-
-              if (this.graph) {
-                this.graph.dispose();
-                this.root.dispose();
-                this.legendRoot.dispose();
               }
+              telemetryData.push({ ...telemetry, chartType: key.chartType, unit: key.unit, name: device.label + ' ' + key.name, color: key.color })
+              completedRequests++;
+              // Verifica si todas las solicitudes se han completado
+              if (completedRequests === totalRequests) {
+
+                if (this.graph) {
+                  this.graph.dispose();
+                  this.root.dispose();
+                  this.legendRoot.dispose();
+                }
 
 
-              this.ChartXY(this.telemetryData, this.summaryData);
-              console.log(subscribing, 'unsubscribe')
-              subscribing.unsubscribe();
-            }
-          })
+                this.ChartXY(telemetryData, this.summaryData);
+
+                this.toggleIsLoading(false);
+              }
+            })
         })
       });
     } catch (error) {
+      console.log(error)
       this.isAlert = 'Error fetching data, please try again';
       this.toggleIsLoading(false);
     }
@@ -736,21 +798,30 @@ export class EMSChartComponent implements OnInit, OnDestroy {
     this.isConfigChange = true
   }
 
-  setClearAllFields() {
+  /**
+   * Sets the selectedKeys array to an empty array and sets the isConfigChange flag to true.
+   */
+  setClearAllFields(): void {
     this.selectedKeys = [];
     this.isConfigChange = true
   }
 
 
   // toggle 
-  toggleFilterSidebar() {
+  toggleFilterSidebar(): void {
     this.toggleFilter = !this.toggleFilter;
   }
 
 
 
 
-  nextInterval() {
+  /**
+   * Updates the interval and resolution selection for the chart.
+   * Disables options below the default resolution.
+   * Disposes the graph, root, and legendRoot if they exist.
+   * Updates the chart if there are selected device IDs.
+   */
+  nextInterval(): void {
     this.intervals = INTERVALS;
     const currentIndex = this.intervals.indexOf(this.intervalSelected);
     const nextIndex = (currentIndex + 1) % this.intervals.length;
@@ -779,7 +850,16 @@ export class EMSChartComponent implements OnInit, OnDestroy {
 
   }
 
-  prevInterval() {
+  /**
+   * Moves to the previous interval in the chart.
+   * 
+   * This function updates the intervalSelected property to the previous interval in the intervals array.
+   * It also updates the resolutionSelected property based on the defaultResolution of the new interval.
+   * It disables options below the default resolution in the UI.
+   * If there are selectedDeviceIds, it updates the chart accordingly.
+   * If there is an existing graph, it disposes it along with its associated elements.
+   */
+  prevInterval(): void {
     this.intervals = INTERVALS;
     const currentIndex = this.intervals.indexOf(this.intervalSelected);
     const prevIndex = (currentIndex - 1 + this.intervals.length) % this.intervals.length;
@@ -810,38 +890,99 @@ export class EMSChartComponent implements OnInit, OnDestroy {
   }
 
 
-  isSelectedField(field: { name: string, keys: string[], unit: string, agg: AggregationType }) {
+  /**
+   * Checks if a field is selected.
+   * 
+   * @param field - The field to check.
+   * @returns A boolean indicating whether the field is selected or not.
+   */
+  isSelectedField({ field }: { field: { name: string; keys: string[]; unit: string; agg: AggregationType; }; }): boolean {
     return this.selectedKeys.some((selectedField) => selectedField.name === field.name);
 
   }
 
 
+  /**
+   * Sets the custom date for the specified type.
+   * 
+   * @param e - The event object containing the target value.
+   * @param type - The type of the custom date ("start" or "end").
+   */
+  setCustomDate({ e, type }: { e:  { value: any; }; type: "start" | "end"; }): void {
+    const { value } = e;
+    if (type === 'start') {
+      this.customStartDate = value;
+    } else {
+      this.customEndDate = value;
+      this.intervalSelected = this.intervals.find((interval) => interval.id === 12);
+      // agregarle un dia a la fecha final
+      const startDate = new Date(new Date(this.customStartDate).setHours(0, 0, 0, 0));
+      const endDate = new Date(new Date(this.customEndDate).setHours(23, 59, 59, 999));
+      this.intervalSelected.startDate = startDate.setDate(startDate.getDate());
+      this.intervalSelected.endDate = endDate.setDate(endDate.getDate())
+      this.intervalSelected.minResolution = this.intervalSelected.getMinResolution();
+      this.intervalSelected.defaultResolution = this.intervalSelected.getDefaultResolution();
+      this.intervalSelected.agg = this.intervalSelected.getAgg();
+      this.intervalModalIsOpen = false;
+      this.selectInterval(this.intervalSelected);
+    }
+  }
+
   selectInterval(interval: any) {
-
+    console.log('interval', interval)
     this.intervalSelected = interval;
-
     this.resolutionSelected = this.resolutions.find((resolution) => resolution.id === this.intervalSelected.defaultResolution);
     const radios = document.getElementsByName('resolution') as NodeListOf<HTMLInputElement>;
     const findIndex = this.resolutions.findIndex((resolution) => resolution.id === this.intervalSelected.minResolution);
     // disabled options below the default resolution
-    for (let i = 0; i < radios.length; i++) {
-      if (i < findIndex) {
-        radios[i].disabled = true;
-      } else {
-        radios[i].disabled = false;
+    if (this.intervalSelected.name !== 'Custom') {
+
+      this.customStartDate = null;
+      this.customEndDate = null;
+
+      for (let i = 0; i < radios.length; i++) {
+        if (i < findIndex) {
+          radios[i].disabled = true;
+        } else {
+          radios[i].disabled = false;
+        }
       }
-    }
 
 
-    if (this.graph) {
-      this.graph.dispose();
-      this.root.dispose();
-      this.legendRoot.dispose();
-    }
-    this.intervalModalIsOpen = false;
-    if (this.selectedDeviceIds.length > 0) {
+      if (this.graph) {
+        this.graph.dispose();
+        this.root.dispose();
+        this.legendRoot.dispose();
+      }
+      this.intervalModalIsOpen = false;
+      if (this.selectedDeviceIds.length > 0) {
 
-      this.updateChart();
+        this.updateChart();
+      }
+    } else {
+      if (this.customStartDate && this.customEndDate) {
+        for (let i = 0; i < radios.length; i++) {
+          if (i < findIndex) {
+            radios[i].disabled = true;
+          } else {
+            radios[i].disabled = false;
+          }
+        }
+
+
+        if (this.graph) {
+          this.graph.dispose();
+          this.root.dispose();
+          this.legendRoot.dispose();
+        }
+        this.intervalModalIsOpen = false;
+        if (this.selectedDeviceIds.length > 0) {
+
+          this.updateChart();
+        }
+      } else {
+        this.isAlert = 'Please select a start and end date';
+      }
     }
   }
   groupDataByInterval(data, interval, type = 'NONE') {

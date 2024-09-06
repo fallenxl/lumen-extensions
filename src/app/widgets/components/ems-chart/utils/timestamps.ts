@@ -37,3 +37,14 @@ export function getResolutionByInterval(startDate: number, endDate: number):Reso
 
   return res;
 }
+
+export function getFormattedDate(date: number): string {
+    const d = new Date(date);
+    const month = d.toLocaleString('default', { month: 'long' });
+    const day = d.getDate();
+    const year = d.getFullYear();
+    const hours = d.getHours() < 10 ? `0${d.getHours()}` : d.getHours();
+    const minutes = d.getMinutes() < 10 ? `0${d.getMinutes()}` : d.getMinutes();
+    const seconds = d.getSeconds() < 10 ? `0${d.getSeconds()}` : d.getSeconds();
+    return `${day} ${month} ${year} ${hours}:${minutes}:${seconds}`;
+}

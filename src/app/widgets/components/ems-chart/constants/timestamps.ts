@@ -1,3 +1,7 @@
+import { min } from "rxjs"
+import { fillData } from "../utils/aggregation"
+import { getFormattedDate } from "../utils/timestamps"
+
 export const RESOLUTIONS = [
     // {
     //     id: 1,
@@ -128,7 +132,8 @@ export const INTERVALS = [
         id: 3,
         name: "This week",
         startDate: new Date().setHours(0, 0, 0, 0) - new Date().getDay() * 86400000,
-        endDate: new Date().setHours(23, 59, 59, 999),
+        // end of the week
+        endDate: new Date().setHours(23, 59, 59, 999) + (6 - new Date().getDay()) * 86400000,
         toString: function () {
             return `${new Date(this.startDate).toDateString()} - ${new Date(this.endDate).toDateString()}`
         },
@@ -170,7 +175,8 @@ export const INTERVALS = [
         id: 6,
         name: "This month",
         startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).setHours(0, 0, 0, 0),
-        endDate: new Date().setHours(23, 59, 59, 999),
+        // end of the month
+        endDate: new Date().setHours(23, 59, 59, 999) + (new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate() - new Date().getDate()) * 86400000,
         toString: function () {
             return `${new Date(this.startDate).toDateString()} - ${new Date(this.endDate).toDateString()}`
         },
@@ -178,7 +184,8 @@ export const INTERVALS = [
         defaultResolution: 6,
         minGrid: 60,
         agg: 'day',
-        minZoom: 0
+        minZoom: 0,
+        fillData    : true
 
     }, {
         id: 7,
@@ -222,6 +229,64 @@ export const INTERVALS = [
         minZoom: 0
 
     },
+    {
+
+        id:12,
+        name: "Custom",
+        toString: function () {
+            // format 12 sep 2021 - 15 sep 2021
+            const parseStartDate = this.startDate ? new Date(this.startDate).toLocaleDateString() : 'Select start date'
+            const parseEndDate = this.endDate ? new Date(this.endDate).toLocaleDateString() : 'Select end date'
+            return `Custom, ${getFormattedDate(this.startDate)} - ${getFormattedDate(this.endDate)}`
+        },
+        startDate: null,
+        endDate: null,
+        getMinResolution: function () {
+            if(this.startDate && this.endDate){
+                const diff = new Date(this.endDate).getTime() - new Date(this.startDate).getTime()
+                if(diff < 86400000){
+                    return 2
+                } else if(diff < 604800000){
+                    return 4
+                } else if(diff < 2592000000){
+                    return 6
+                } else {
+                    return 7
+                }
+            }
+        },
+        getDefaultResolution: function () {
+            if(this.startDate && this.endDate){
+                const diff = new Date(this.endDate).getTime() - new Date(this.startDate).getTime()
+                if(diff < 86400000){
+                    return 10
+                } else if(diff < 604800000){
+                    return 6
+                } else if(diff < 2592000000){
+                    return 6
+                } else {
+                    return 7
+                }
+            }
+        },
+        getAgg: function () {
+            if(this.startDate && this.endDate){
+                const diff = new Date(this.endDate).getTime() - new Date(this.startDate).getTime()
+                if(diff < 86400000){
+                    return 'minute'
+                } else if(diff < 604800000){
+                    return 'hour'
+                } else if(diff < 2592000000){
+                    return 'day'
+                } else {
+                    return 'day'
+                }
+            }
+        },
+        minZoom: 0,
+        minGrid: 50,
+        fillData: true
+    }
     // {
     //     id: 10,
     //     name: "This year",

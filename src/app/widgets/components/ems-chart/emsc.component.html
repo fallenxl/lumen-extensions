@@ -96,7 +96,7 @@
         </ng-container>
       </div>
       <div class="mt-auto flex w-full">
-        <small><strong>Lumen Widgets</strong> Beta v1.0.1 </small>
+        <small><strong>Lumen Widgets</strong> Beta v1.1.0 </small>
       </div>
     </div>
   </div>
@@ -196,15 +196,31 @@
             style="width: auto"
           >
             <div class="flex gap-2 w-full justify-between">
-              <!-- <div class="flex items-center gap-2">
-                <i class="fa-solid fa-calendar"></i>
-                <small class="font-bold">Select interval</small>
-              </div> -->
-              <div class="flex flex-col items-center gap-2 overflow-auto px-2">
-                <small class="font-bold">Select interval</small>
+              <div class="flex flex-col gap-2 w-96">
+               
+                <mat-form-field class="custom-calendar" >
+                  <mat-label>Enter a date range</mat-label>
+                  <mat-date-range-input
+                  [rangePicker]="picker">
+                    <input
+                    (dateInput)="setCustomDate({e: $event, type: 'start'})"
+                    (dateChange)="setCustomDate({e: $event, type: 'start'})"
+                    matStartDate placeholder="Start date">
+                    <input
+                    (dateInput)="setCustomDate({e: $event, type: 'end'})"
+                    (dateChange)="setCustomDate({e: $event, type: 'end'})"
+                    matEndDate placeholder="End date">
+                  </mat-date-range-input>
+
+                  <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+                  <mat-date-range-picker
+                  #picker></mat-date-range-picker>
+                </mat-form-field>
+              </div>
+              <div class="flex flex-col items-center gap-2 overflow-auto px-2 border-l">
                 <div
                   *ngFor="let interval of intervals"
-                  class="flex items-center justify-center border px-3 w-32 cursor-pointer hover:bg-gray-50"
+                  class="flex items-center justify-center bg-gray-50 px-3 w-32 cursor-pointer hover:bg-gray-50"
                   (click)="selectInterval(interval)"
                 >
                   <label class="cursor-pointer">{{ interval.name }}</label>
@@ -449,7 +465,7 @@
           type="checkbox"
           [value]="field"
           (click)="toggleField(field)"
-          [checked]="isSelectedField(field)"
+          [checked]="isSelectedField({field})"
         />
         <label class="">{{ field.name }}</label>
       </div>

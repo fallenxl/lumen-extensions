@@ -16,5 +16,6 @@ export interface EntityRelation {
     toName: string,
     relations: EntityRelation[]
     expanded?: boolean;
+    isDefault?: boolean;
     label: string;
 }
