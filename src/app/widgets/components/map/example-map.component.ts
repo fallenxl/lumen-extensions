@@ -112,7 +112,6 @@ export class ExampleMap implements MapWidgetInterface, OnInit {
     this.settings.tooltipAction = this.getDescriptors('tooltipAction');
     this.settings.markerClick = this.getDescriptors('markerClick');
     this.settings.polygonClick = this.getDescriptors('polygonClick');
-
     const MapClass = providerSets[this.provider]?.MapClass;
     if (!MapClass) {
       return;

@@ -14,7 +14,7 @@ import { CustomAlarmsTableWidgetComponent } from './components/alarm/custom-alar
 @NgModule({
   declarations: [
     ExampleMap,
-    CustomAlarmsTableWidgetComponent
+    CustomAlarmsTableWidgetComponent,
   ],
   imports: [
     CommonModule,

@@ -1,0 +1,113 @@
+<!--
+
+    Copyright © 2023 ThingsBoard, Inc.
+
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap" rel="stylesheet">
+<link
+  rel="stylesheet"
+  href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css"
+  integrity="sha512-wnea99uKIC3TJF7v4eKk4Y+lMz2Mklv18+r4na2Gn1abDRPPOeef95xTzdwGD9e6zXJBteMIhZ1+68QC5byJZw=="
+  crossorigin="anonymous"
+  referrerpolicy="no-referrer"
+/>
+
+<div
+  class="pvc-container flex flex-col items-center justify-center w-full h-full relative overflow-hidden gap-1"
+>
+  <!-- Flecha de navegación izquierda -->
+  <button
+    (click)="navigate('prev')"
+    [ngClass]="{
+      hidden: setting.fixedInterval
+    }"
+    [disabled]="setting.fixedInterval"
+    class="absolute left-0 p-2"
+    style="top: 50%; transform: translateY(-50%)"
+  >
+    <i class="fa fa-chevron-left"></i>
+  </button>
+  <div
+    class="text-center text-gray-500 font-medium"
+    style="font-size: .8rem"
+  >
+    {{ setting.title }}
+  </div>
+  <div class="flex items-end justify-between gap-4">
+    <div
+      class="flex items-end justify-start gap-2 rounded-md"
+      [style]="{
+        backgroundColor: iconBackgroundColor,
+        maxWidth: iconSize + 'px',
+        maxHeight: iconSize + 'px'
+      }"
+    >
+      <tb-icon
+        class="h-full w-full flex items-end justify-center rounded-md p-1"
+        *ngIf="useIcon"
+        [ngStyle]="{
+        color: iconColor,
+        fontSize: iconSize + 'px',
+      }"
+        >{{ icon }}</tb-icon
+      >
+    </div>
+
+    <div
+      class="flex flex-col h-full items-center justify-center gap-2"
+      [ngStyle]="{ transform: 'scale(' + scaleFactor + ')' }"
+    >
+      <!-- Display del valor actual (Today) en el centro -->
+      <div class="text-center">
+        <div class="text-xs text-gray-500">
+          {{ intervals[currentIndex] }}
+        </div>
+        <span 
+        style="font-size: 1.1rem;"
+        class="font-bold text-gray-800">
+          {{ parseNumberWithCommas(result) + " " + unit }}
+        </span>
+      </div>
+    </div>
+  </div>
+  <!-- Comparación con el intervalo anterior (Yesterday, Last Week, Last Month) -->
+  <div
+    class="text-center text-gray-500 flex items-center gap-2 w-full justify-center"
+  >
+    <span class="text-xs text-gray-400">{{
+      comparisonIntervals[currentIndex]
+    }}</span>
+    <div class="text-xs font-semibold">
+      {{ parseNumberWithCommas(comparisonResult) + " " + unit }}
+    </div>
+    <!-- Porcentaje de diferencia -->
+    <div
+      class="text-center text-xs font-medium"
+      [ngClass]="{
+        'text-red-500': percentageDifference > 0,
+        'text-green-500': percentageDifference < 0
+      }"
+    >
+      <i
+        class="fa"
+        [class.fa-arrow-up]="percentageDifference > 0"
+        [class.fa-arrow-down]="percentageDifference < 0"
+      ></i>
+      {{ percentageDifference | number : "1.0-2" }}%
+    </div>
+  </div>
+  <!-- Flecha de navegación derecha -->
+  <button
+    (click)="navigate('next')"
+    [ngClass]="{
+      hidden: setting.fixedInterval
+    }"
+    [disabled]="setting.fixedInterval"
+    class="absolute right-0 p-2"
+    style="top: 50%; transform: translateY(-50%)"
+  >
+    <i class="fa fa-chevron-right"></i>
+  </button>
+</div>
