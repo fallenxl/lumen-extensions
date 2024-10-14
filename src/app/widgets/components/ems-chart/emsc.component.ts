@@ -8,7 +8,7 @@ import * as am5xy from "@amcharts/amcharts5/xy";
 import { INTERVALS, RESOLUTIONS } from './constants/timestamps';
 import { TimeUnit } from '@amcharts/amcharts5/.internal/core/util/Time';
 import { fillData, getTypeChart } from './utils/aggregation';
-
+import * as XLSX from 'xlsx';
 // amchart themes
 import am5themes_Animated from "@amcharts/amcharts5/themes/Animated";
 
@@ -189,6 +189,79 @@ export class EMSChartComponent implements OnInit, OnDestroy {
 
   }
 
+  exportData() {
+    const workbook = XLSX.utils.book_new(); // Crea un nuevo libro de trabajo
+  
+    this.summaryData.forEach((item) => {
+      // Formatea los datos para la hoja de cálculo
+      const data = item.data.map((entry) => {
+        const date = new Date(entry.date).toISOString().replace('T', ' ').substring(0, 19); // Formatea la fecha en un formato compatible con Excel
+        const valueWithUnit = entry.value !== null ? `${entry.value}` : 'N/A'; // Concatenar valor con unidad o 'N/A' si es null
+        return {
+          Date: date,
+          Value: valueWithUnit,
+        };
+      });
+  
+      // Calcular el promedio y el total (si el field es 'Enegy')
+      const values = item.data
+        .filter((entry) => entry.value !== null)
+        .map((entry) => entry.value);
+  
+      const average = values.length > 0 ? (values.reduce((sum, val) => sum + val, 0) / values.length).toFixed(2) : 0;
+      const total = item.field === 'Enegy' ? values.reduce((sum, val) => sum + val, 0).toFixed(2) : null;
+  
+      // Agregar el promedio al final
+      data.push({ Date: 'Average', Value: `${average} ${item.unit}` });
+  
+      // Agregar el total al final (si aplica)
+      if (total !== null) {
+        data.push({ Date: 'Total', Value: `${total} ${item.unit}` });
+      }
+  
+      // Crear la hoja de cálculo para este ítem
+      const worksheet = XLSX.utils.json_to_sheet(data);
+  
+      // Añadir estilo de colores a los encabezados
+      const range = XLSX.utils.decode_range(worksheet['!ref']); 
+      for (let C = range.s.c; C <= range.e.c; ++C) {
+        const cell_ref = XLSX.utils.encode_cell({ r: 0, c: C });
+        if (!worksheet[cell_ref]) continue;
+        worksheet[cell_ref].s = {
+          fill: { fgColor: { rgb: "FFFF00" } }, // Color de fondo amarillo
+          font: { bold: true }, // Texto en negrita
+        };
+      }
+  
+      // Formatear tamaño de las celdas de fecha para que sean más grandes
+      const colWidths = [
+        { wch: 20 }, // Ancho para la columna de fecha
+        { wch: 15 }  // Ancho para la columna de valores
+      ];
+  
+      worksheet['!cols'] = colWidths;
+  
+      // Agregar la hoja al libro de trabajo
+      XLSX.utils.book_append_sheet(workbook, worksheet, item.name);
+    });
+  
+    // Generar el archivo Excel
+    const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+  
+    // Crear un Blob para descargar el archivo
+    const blob = new Blob([wbout], { type: 'application/octet-stream' });
+  
+    // Crear un enlace para la descarga
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ems-chart-data-${new Date().toISOString().split('T')[0]}.xlsx`;
+    a.click();
+  
+    // Liberar la URL
+    window.URL.revokeObjectURL(url);
+  }
+
   toggle(item: EntityRelation) {
     item.expanded = !item.expanded;
   }
@@ -226,6 +299,7 @@ export class EMSChartComponent implements OnInit, OnDestroy {
       this.selectedAssets = this.selectedAssets.filter((selectedAsset) => selectedAsset !== asset);
 
     }
+    console.log('selectedAssets', this.selectedAssets)
   }
 
 

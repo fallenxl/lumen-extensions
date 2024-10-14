@@ -29,7 +29,6 @@
   class="fixed top-0 left-0 flex items-center justify-center w-full h-full"
   style="background: rgba(0, 0, 0, 0.2); z-index: 100"
   *ngIf="isLoading"
-
 >
   <div class="flex items-center gap-2 border bg-white px-2 py-1">
     <small class="text-sm">Loading </small>
@@ -37,7 +36,7 @@
 </div>
 
 <!-- Hierarchy -->
-<div class="flex w-full relative h-full" style="min-height: 100%;">
+<div class="flex w-full relative h-full" style="min-height: 100%">
   <!-- Sidebar -->
   <div
     class="flex flex-col transition-all duration-300 items-center relative h-full"
@@ -139,7 +138,7 @@
   <!-- chart -->
   <div
     class="flex flex-col relative pl-6 pr-3 overflow-auto border-l border-r border-l-gray-200 border-r-gray-200"
-    style="width: 100%; min-height: 100%;"
+    style="width: 100%; min-height: 100%"
   >
     <!-- Chart Header -->
     <div
@@ -155,28 +154,52 @@
       <div class="flex flex-col gap-4 items-end relative">
         <!-- Graph options -->
 
-        <!-- Show filter -->
-        <div
-          class="border border-gray-300 px-2 rounded-full cursor-pointer flex items-center justify-center gap-2 w-28"
-          (click)="toggleFilterSidebar()"
-        >
-          <svg
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke-width="1"
-            stroke="currentColor"
-            style="width: 16px; height: 16px"
+        <div class="flex items-center gap-2">
+          <!-- Show filter -->
+          <div
+            class="border border-gray-300 px-2 rounded-full cursor-pointer flex items-center justify-center gap-2 w-28"
+            (click)="toggleFilterSidebar()"
           >
-            <path
+            <svg
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke-width="1"
+              stroke="currentColor"
+              style="width: 16px; height: 16px"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 0 1-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927a2.25 2.25 0 0 1-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 0 0-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0 1 12 3Z"
+              />
+            </svg>
+            <small *ngIf="toggleFilter">Hide filters</small>
+            <small *ngIf="!toggleFilter">Show filters</small>
+          </div>
+          <div
+            class="border border-gray-300 px-2 rounded-full cursor-pointer flex items-center justify-center gap-2 w-28"
+            (click)="exportData()"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1"
               stroke-linecap="round"
               stroke-linejoin="round"
-              d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 0 1-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927a2.25 2.25 0 0 1-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 0 0-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0 1 12 3Z"
-            />
-          </svg>
-          <small *ngIf="toggleFilter">Hide filters</small>
-          <small *ngIf="!toggleFilter">Show filters</small>
+              style="width: 16px; height: 16px"
+            >
+              <path
+                d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"
+              />
+              <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+              <path d="M12 18v-6" />
+              <path d="m9 15 3 3 3-3" />
+            </svg>
+            <small class="text-gray-500">Export</small>
+          </div>
         </div>
-        <!-- End show filter -->
         <div class="flex items-center gap-4 relative">
           <i
             class="fa-solid fa-chevron-left text-gray-500 cursor-pointer"
@@ -197,27 +220,33 @@
           >
             <div class="flex gap-2 w-full justify-between">
               <div class="flex flex-col gap-2 w-96">
-               
-                <mat-form-field class="custom-calendar" >
+                <mat-form-field class="custom-calendar">
                   <mat-label>Enter a date range</mat-label>
-                  <mat-date-range-input
-                  [rangePicker]="picker">
+                  <mat-date-range-input [rangePicker]="picker">
                     <input
-                    (dateInput)="setCustomDate({e: $event, type: 'start'})"
-                    (dateChange)="setCustomDate({e: $event, type: 'start'})"
-                    matStartDate placeholder="Start date">
+                      (dateInput)="setCustomDate({ e: $event, type: 'start' })"
+                      (dateChange)="setCustomDate({ e: $event, type: 'start' })"
+                      matStartDate
+                      placeholder="Start date"
+                    />
                     <input
-                    (dateInput)="setCustomDate({e: $event, type: 'end'})"
-                    (dateChange)="setCustomDate({e: $event, type: 'end'})"
-                    matEndDate placeholder="End date">
+                      (dateInput)="setCustomDate({ e: $event, type: 'end' })"
+                      (dateChange)="setCustomDate({ e: $event, type: 'end' })"
+                      matEndDate
+                      placeholder="End date"
+                    />
                   </mat-date-range-input>
 
-                  <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
-                  <mat-date-range-picker
-                  #picker></mat-date-range-picker>
+                  <mat-datepicker-toggle
+                    matIconSuffix
+                    [for]="picker"
+                  ></mat-datepicker-toggle>
+                  <mat-date-range-picker #picker></mat-date-range-picker>
                 </mat-form-field>
               </div>
-              <div class="flex flex-col items-center gap-2 overflow-auto px-2 border-l">
+              <div
+                class="flex flex-col items-center gap-2 overflow-auto px-2 border-l"
+              >
                 <div
                   *ngFor="let interval of intervals"
                   class="flex items-center justify-center bg-gray-50 px-3 w-32 cursor-pointer hover:bg-gray-50"
@@ -244,15 +273,15 @@
     ></div>
 
     <div *ngIf="isUpdated" id="legendwrapper">
-      <div
-     
-        id="legenddiv"
-      ></div>
+      <div id="legenddiv"></div>
     </div>
-   
 
     <!-- Summary data -->
-    <div *ngIf="isUpdated" class="summary-container mt-10" style="max-height: 600px;">
+    <div
+      *ngIf="isUpdated"
+      class="summary-container mt-10"
+      style="max-height: 600px"
+    >
       <div class="summary-header border-b border-b-gray-200">
         <div
           class="summary-title relative cursor-pointer"
@@ -302,7 +331,7 @@
 
   <!-- Devices -->
   <div
-    class="hierarchy_container overflow-auto px-4 relative   pl-6 duration-300"
+    class="hierarchy_container overflow-auto px-4 relative pl-6 duration-300"
     style="width: 30%"
     [ngClass]="{ hidden: !toggleFilter }"
   >
@@ -364,6 +393,7 @@
       </div>
     </div>
     <!-- Render selected devices of selected assets -->
+    <!-- Renderizar dispositivos y sus subdispositivos recursivamente -->
     <div
       class="hierarchy-list list-none pl-2 relative mt-4 duration-300"
       *ngIf="expandedSections.devices"
@@ -386,49 +416,60 @@
             ></i>
             <span (click)="toggle(asset)">{{ asset.toName }}</span>
           </div>
+
+          <!-- Renderizar los dispositivos de cada asset -->
           <ul *ngIf="asset.expanded" class="nested-list">
-            <li *ngFor="let device of assetDevices[asset.to.id]">
-              <div class="item">
-                <i
-                  *ngIf="device.relations.length > 0 && !device.expanded"
-                  class="fa-solid fa-plus"
-                  (click)="toggle(device)"
-                ></i>
-                <i
-                  *ngIf="device.relations.length > 0 && device.expanded"
-                  class="fa-solid fa-minus"
-                  (click)="toggle(device)"
-                ></i>
-                <input
-                  type="checkbox"
-                  name="item"
-                  [id]="device.to.id"
-                  [value]="device.to.id"
-                  [checked]="isSelected(device.to)"
-                  (change)="toggleSelection($event, device)"
-                />
-                <span>{{ device.label }}</span>
-              </div>
-              <ul *ngIf="device.expanded" class="nested-list">
-                <li *ngFor="let subDevice of device.relations">
-                  <div class="item">
-                    <input
-                      type="checkbox"
-                      name="item"
-                      [id]="subDevice.to.id"
-                      [value]="subDevice.to.id"
-                      [checked]="isSelected(subDevice.to)"
-                      (change)="toggleSelection($event, subDevice)"
-                    />
-                    <span>{{ subDevice.label }}</span>
-                  </div>
-                </li>
-              </ul>
-            </li>
+            <ng-container
+              *ngTemplateOutlet="
+                renderDevices;
+                context: { devices: assetDevices[asset.to.id] }
+              "
+            ></ng-container>
           </ul>
         </li>
       </ul>
     </div>
+
+    <!-- Template recursivo para renderizar dispositivos y subdispositivos -->
+    <ng-template #renderDevices let-devices="devices">
+      <li *ngFor="let device of devices">
+        <div class="item">
+          <!-- Expandir y colapsar subdispositivos -->
+          <i
+            *ngIf="device.relations.length > 0 && !device.expanded"
+            class="fa-solid fa-plus"
+            (click)="toggle(device)"
+          ></i>
+          <i
+            *ngIf="device.relations.length > 0 && device.expanded"
+            class="fa-solid fa-minus"
+            (click)="toggle(device)"
+          ></i>
+
+          <!-- Checkbox para seleccionar dispositivos -->
+          <input
+            type="checkbox"
+            name="item"
+            [id]="device.to.id"
+            [value]="device.to.id"
+            [checked]="isSelected(device.to)"
+            (change)="toggleSelection($event, device)"
+          />
+          <span>{{ device.label }}</span>
+        </div>
+
+        <!-- Si tiene subdispositivos y está expandido, renderiza recursivamente -->
+        <ul *ngIf="device.expanded" class="nested-list">
+          <ng-container
+            *ngTemplateOutlet="
+              renderDevices;
+              context: { devices: device.relations }
+            "
+          ></ng-container>
+        </ul>
+      </li>
+    </ng-template>
+
     <div
       class="border-b border-t border-dotted border-gray-200 flex items-center gap-2 text-gray-500 py-2 mt-4 justify-between"
     >
