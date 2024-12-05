@@ -1598,7 +1598,7 @@ function encodeDownlink(input) {
       bytes.forEach(byte => binary += String.fromCharCode(byte));
       return btoa(binary);
   }
-  export function sendCommand(appName:string,deviceId:string,json:{}){
+  export function sendCommand(appName:string,token:string, deviceId:string,json:{}){
       let data = {
           bytes: encodeDownlink({
               data: json
@@ -1612,10 +1612,11 @@ function encodeDownlink(input) {
       
         }
         
-      fetch(`https://lumen-network.nam1.cloud.thethings.industries/api/v3/as/applications/${appName}/devices/${deviceId}/down/push`, {
+      fetch(`https://nam1.cloud.thethings.network/api/v3/as/applications/${appName}/devices/${deviceId}/down/push`, {
           method: "POST",
           headers: {
-              Authorization: `Bearer NNSXS.6URDBHGP6GEKGWXX4YAVOCXLEFJFX5UEHNYD6RA.MCXAJZAHRC6SOFAAUTIM3FKDIJ7I354PHYTDOAUHUM37QPNUABXA`,
+              // Authorization: `Bearer NNSXS.6URDBHGP6GEKGWXX4YAVOCXLEFJFX5UEHNYD6RA.MCXAJZAHRC6SOFAAUTIM3FKDIJ7I354PHYTDOAUHUM37QPNUABXA`,
+              Authorization: `Bearer ${token}`,
               "Content-Type": "application/json",
           },
           body: JSON.stringify({

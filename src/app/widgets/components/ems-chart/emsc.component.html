@@ -222,7 +222,7 @@
               <div class="flex flex-col gap-2 w-96">
                 <mat-form-field class="custom-calendar">
                   <mat-label>Enter a date range</mat-label>
-                  <mat-date-range-input [rangePicker]="picker">
+                  <mat-date-range-input [rangePicker]="picker" >
                     <input
                       (dateInput)="setCustomDate({ e: $event, type: 'start' })"
                       (dateChange)="setCustomDate({ e: $event, type: 'start' })"

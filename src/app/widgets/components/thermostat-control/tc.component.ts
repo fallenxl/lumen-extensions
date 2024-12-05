@@ -1,8 +1,9 @@
 import { Component, Input, OnDestroy, OnInit, ViewEncapsulation } from '@angular/core';
 import { WidgetContext } from '@home/models/widget-component.models';
-import { FanMode, sendCommand, TemperatureControlMode } from './encoder';
+import { FanMode, sendCommand, TemperatureControlMode } from './utils/encoder';
 import { Subject } from 'rxjs';
 import { debounceTime, switchMap } from 'rxjs/operators';
+import { getMilesightTokenService } from './services/milesight.services';
 
 @Component({
   selector: 'thermostat-control',
@@ -14,9 +15,11 @@ export class ThermostatControlComponent implements OnInit, OnDestroy {
 
   constructor() { }
 
-  @Input() ctx: WidgetContext;
-  appName: string;
+  @Input() ctx: WidgetContext;;
   deviceId: string;
+  apiURL: string;
+  clientId: string;
+  clientSecret: string;
 
   thermostatData: any = {};
   temperature: number = 0;
@@ -29,6 +32,7 @@ export class ThermostatControlComponent implements OnInit, OnDestroy {
   blockedButtons = false;
   isError = false
   errorMessage = "";
+
   private timeoutHandle: any;
 
   private increaseTempSubject = new Subject<number>();
@@ -42,10 +46,15 @@ export class ThermostatControlComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.ctx.$scope.isValid = this.isValid;
-    this.appName = this.ctx.settings.appName;
+    this.apiURL = this.ctx.settings.apiURL;
+    this.clientId = this.ctx.settings.clientId;
+    this.clientSecret = this.ctx.settings.clientSecret;
     this.ctx.$scope.onDataUpdated = this.onDataUpdated.bind(this);
     this.ctx.$scope.parseData = this.parseData.bind(this);
 
+    getMilesightTokenService(this.apiURL, this.clientId, this.clientSecret).then((response) => {
+      console.log(response);
+    });
     this.increaseTempSubscription = this.increaseTempSubject.pipe(
       debounceTime(1000),
       switchMap((increment) => {
@@ -68,7 +77,7 @@ export class ThermostatControlComponent implements OnInit, OnDestroy {
       })
     ).subscribe();
 
-    if (this.ctx.datasources[0].entityType === 'DEVICE' && this.ctx.datasources[0].type === 'entity' && this.appName) {
+    if (this.ctx.datasources[0].entityType === 'DEVICE' && this.ctx.datasources[0].type === 'entity') {
       this.ctx.$scope.isValid = true;
       this.isValid = true;
 
@@ -103,6 +112,7 @@ export class ThermostatControlComponent implements OnInit, OnDestroy {
     let data = this.ctx.defaultSubscription.data;
     if (this.ctx.defaultSubscription) {
       data?.forEach((data) => {
+
         thermostatData[data.dataKey.label] = {
           label: data.dataKey.label,
           name: data.dataKey.name,
@@ -113,6 +123,7 @@ export class ThermostatControlComponent implements OnInit, OnDestroy {
         };
       });
     }
+    console.log(thermostatData);
     return thermostatData;
   }
 
@@ -149,11 +160,11 @@ export class ThermostatControlComponent implements OnInit, OnDestroy {
   performIncreaseTemperature(increment) {
     this.timeoutFunction();
     const temperatureTarget = this.ctx.$scope.data.find((data) => data.dataKey.label == "temperatureTarget")?.data[0][1];
-    sendCommand(this.appName, this.deviceId, {
-      temperature_control_mode: TemperatureControlMode[this.thermostatData.temperatureControlMode.value],
-      temperature_unit: 0,
-      temperature_target: temperatureTarget + increment
-    });
+    // sendCommand(this.appName, this.token,this.deviceId, {
+    //   temperature_control_mode: TemperatureControlMode[this.thermostatData.temperatureControlMode.value],
+    //   temperature_unit: 0,
+    //   temperature_target: temperatureTarget + increment
+    // });
     this.increaseClickCount = 0;
   }
 
@@ -161,19 +172,19 @@ export class ThermostatControlComponent implements OnInit, OnDestroy {
     this.timeoutFunction();
     this.ctx.$scope.isLoaded = true;
     const temperatureTarget = this.ctx.$scope.data.find((data) => data.dataKey.label == "temperatureTarget")?.data[0][1];
-    sendCommand(this.appName, this.deviceId, {
-      temperature_control_mode: TemperatureControlMode[this.thermostatData.temperatureControlMode.value],
-      temperature_unit: 0,
-      temperature_target: temperatureTarget - decrement
-    });
+    // sendCommand(this.appName,this.token, this.deviceId, {
+    //   temperature_control_mode: TemperatureControlMode[this.thermostatData.temperatureControlMode.value],
+    //   temperature_unit: 0,
+    //   temperature_target: temperatureTarget - decrement
+    // });
     this.decreaseClickCount = 0;
   }
 
   togglePower() {
     this.timeoutFunction();
-    sendCommand(this.appName, this.deviceId, {
-      temperature_control_enable: this.ctx.$scope.data[0].data[0][1] == "on" ? 0 : 1
-    });
+    // sendCommand(this.appName, this.token,this.deviceId, {
+    //   temperature_control_enable: this.ctx.$scope.data[0].data[0][1] == "on" ? 0 : 1
+    // });
   }
 
   timeoutFunction() {
@@ -223,7 +234,7 @@ export class ThermostatControlComponent implements OnInit, OnDestroy {
       this.isLoaded = false;
       this.isError = false;
       this.errorMessage = "";
-      if(this.timeoutHandle) {
+      if (this.timeoutHandle) {
         clearTimeout(this.timeoutHandle);
       }
       if (this.ctx.$scope.isLoaded) {
@@ -241,12 +252,12 @@ export class ThermostatControlComponent implements OnInit, OnDestroy {
 
   confirm() {
     this.timeoutFunction();
-    sendCommand(this.appName, this.deviceId, {
-      temperature_control_mode: TemperatureControlMode[this.updateData.temperatureControlMode.value],
-      temperature_unit: 0,
-      temperature_target: parseFloat(this.updateData.temperatureTarget.value),
-      fan_mode: FanMode[this.updateData.fanMode.value],
-    });
+    // sendCommand(this.appName, this.token,this.deviceId, {
+    //   temperature_control_mode: TemperatureControlMode[this.updateData.temperatureControlMode.value],
+    //   temperature_unit: 0,
+    //   temperature_target: parseFloat(this.updateData.temperatureTarget.value),
+    //   fan_mode: FanMode[this.updateData.fanMode.value],
+    // });
     this.isModalOpen = false;
   }
 

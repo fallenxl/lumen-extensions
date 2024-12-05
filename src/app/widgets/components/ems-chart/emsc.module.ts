@@ -8,6 +8,7 @@ import { SharedModule } from '@shared/public-api';
 import { EMSChartComponent } from './emsc.component';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatDatepickerModule } from '@angular/material/datepicker';
+import { NgxMatDatetimePickerModule, NgxMatTimepickerModule } from '@angular-material-components/datetime-picker';
 
 @NgModule({
   declarations: [
@@ -17,7 +18,8 @@ import { MatDatepickerModule } from '@angular/material/datepicker';
     CommonModule,
     SharedModule,
     MatFormFieldModule,
-    MatDatepickerModule
+    MatDatepickerModule,
+
   ],
   exports: [
     EMSChartComponent

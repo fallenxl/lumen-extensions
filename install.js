@@ -24,5 +24,6 @@ function sourcePackage() {
 }
 
 function targetPackage() {
-  return path.join(projectRoot(), 'target', 'generated-resources', 'thingsboard-extension-widgets.js');
+  const filename = `extension-${new Date().toLocaleDateString().replace(/\//g, '-') + new Date().toLocaleTimeString().replace(/:/g, '-')}.js`;
+  return path.join(projectRoot(), 'target', 'generated-resources', filename);
 }

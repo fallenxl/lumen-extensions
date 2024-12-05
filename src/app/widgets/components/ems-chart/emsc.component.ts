@@ -1,4 +1,4 @@
-import { Component, Input, OnDestroy, OnInit, Renderer2, ViewEncapsulation } from '@angular/core';
+import { Component, Input, OnDestroy, OnInit, ViewEncapsulation } from '@angular/core';
 import { WidgetContext } from '@home/models/widget-component.models';
 import { Series } from './interfaces/chart.interfaces';
 import { DataField, EntityRelation } from './interfaces/data.interfaces';
@@ -11,11 +11,7 @@ import { fillData, getTypeChart } from './utils/aggregation';
 import * as XLSX from 'xlsx';
 // amchart themes
 import am5themes_Animated from "@amcharts/amcharts5/themes/Animated";
-
-import am5themes_Responsive from "@amcharts/amcharts5/themes/Responsive";
-
 import { customColors } from './constants/colors';
-import { Router } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 import { MatCalendarCellClassFunction } from '@angular/material/datepicker';
 
@@ -76,8 +72,8 @@ export class EMSChartComponent implements OnInit, OnDestroy {
     resolution: true,
   };
 
-  customStartDate: Date
-  customEndDate: Date
+  customStartDate: Date = null;
+  customEndDate: Date  = null
 
   fieldsSelected: string[] = [];
   updateFieldsSelected: string[] = [];
@@ -192,11 +188,22 @@ export class EMSChartComponent implements OnInit, OnDestroy {
   exportData() {
     const workbook = XLSX.utils.book_new(); // Crea un nuevo libro de trabajo
   
-    this.summaryData.forEach((item) => {
+    // Crear un array para almacenar todos los datos en un solo libro
+    const allData = [];
+    let maxLength = 0; // Para ajustar el número máximo de filas por item
+  
+    // Insertar encabezado de "Date" en la primera columna
+    allData[0] = ['Date'];
+  
+    // Recorrer cada item en summaryData
+    this.summaryData.forEach((item, index) => {
       // Formatea los datos para la hoja de cálculo
       const data = item.data.map((entry) => {
-        const date = new Date(entry.date).toISOString().replace('T', ' ').substring(0, 19); // Formatea la fecha en un formato compatible con Excel
-        const valueWithUnit = entry.value !== null ? `${entry.value}` : 'N/A'; // Concatenar valor con unidad o 'N/A' si es null
+        // resta 6 horas a la fecha
+
+        const dateTs = new Date(entry.date).setHours(new Date(entry.date).getHours() - 6)
+        const date = new Date(dateTs).toISOString().replace('T', ' ').substring(0, 19); // Formato de fecha
+        const valueWithUnit = entry.value !== null ? parseFloat(entry.value): null; // Valor o 'N/A' si es null
         return {
           Date: date,
           Value: valueWithUnit,
@@ -208,42 +215,41 @@ export class EMSChartComponent implements OnInit, OnDestroy {
         .filter((entry) => entry.value !== null)
         .map((entry) => entry.value);
   
-      const average = values.length > 0 ? (values.reduce((sum, val) => sum + val, 0) / values.length).toFixed(2) : 0;
-      const total = item.field === 'Enegy' ? values.reduce((sum, val) => sum + val, 0).toFixed(2) : null;
-  
-      // Agregar el promedio al final
-      data.push({ Date: 'Average', Value: `${average} ${item.unit}` });
-  
-      // Agregar el total al final (si aplica)
-      if (total !== null) {
-        data.push({ Date: 'Total', Value: `${total} ${item.unit}` });
+      // Guardar la longitud máxima de filas
+      if (data.length > maxLength) {
+        maxLength = data.length;
       }
   
-      // Crear la hoja de cálculo para este ítem
-      const worksheet = XLSX.utils.json_to_sheet(data);
+      // Añadir encabezado para el item en la fila superior, en su correspondiente columna de valores
+      allData[0][index + 1] = `${item.name}`;
   
-      // Añadir estilo de colores a los encabezados
-      const range = XLSX.utils.decode_range(worksheet['!ref']); 
-      for (let C = range.s.c; C <= range.e.c; ++C) {
-        const cell_ref = XLSX.utils.encode_cell({ r: 0, c: C });
-        if (!worksheet[cell_ref]) continue;
-        worksheet[cell_ref].s = {
-          fill: { fgColor: { rgb: "FFFF00" } }, // Color de fondo amarillo
-          font: { bold: true }, // Texto en negrita
-        };
+      // Insertar los datos de valores en las filas correspondientes
+      for (let i = 0; i < data.length; i++) {
+        // Si la fila aún no existe en allData, la creamos
+        if (!allData[i + 1]) {
+          allData[i + 1] = [];
+        }
+  
+        // Solo en la primera columna (index 0), añadimos las fechas
+        if (index === 0) {
+          allData[i + 1][0] = data[i].Date; // Insertar fecha
+        }
+  
+        // Insertar los valores en la columna correspondiente
+        allData[i + 1][index + 1] = data[i].Value;
       }
-  
-      // Formatear tamaño de las celdas de fecha para que sean más grandes
-      const colWidths = [
-        { wch: 20 }, // Ancho para la columna de fecha
-        { wch: 15 }  // Ancho para la columna de valores
-      ];
-  
-      worksheet['!cols'] = colWidths;
-  
-      // Agregar la hoja al libro de trabajo
-      XLSX.utils.book_append_sheet(workbook, worksheet, item.name);
     });
+  
+    // Crear la hoja de cálculo para todos los datos
+    const worksheet = XLSX.utils.aoa_to_sheet(allData);
+  
+    // Formatear tamaño de las celdas para que sean más grandes
+    const colWidths = Array(allData[0].length).fill({ wch: 20 }); // Ancho de 20 para todas las columnas
+  
+    worksheet['!cols'] = colWidths;
+  
+    // Agregar la hoja al libro de trabajo
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'EMS Data');
   
     // Generar el archivo Excel
     const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
@@ -261,7 +267,8 @@ export class EMSChartComponent implements OnInit, OnDestroy {
     // Liberar la URL
     window.URL.revokeObjectURL(url);
   }
-
+  
+  
   toggle(item: EntityRelation) {
     item.expanded = !item.expanded;
   }
@@ -459,12 +466,13 @@ export class EMSChartComponent implements OnInit, OnDestroy {
           }
           xAxis.get("dateFormats")["day"] = "MM/dd";
           xAxis.get("periodChangeDateFormats")["day"] = "MMMM";
-
+          xAxis.get("renderer").grid.template.set("forceHidden", true);
 
           var scrollbarX = am5xy.XYChartScrollbar.new(root, {
             orientation: "horizontal",
             height: 30
           });
+          root.durationFormatter.set("durationFormat", "mm:ss");
           var sbxAxis = scrollbarX.chart.xAxes.push(
             am5xy.DateAxis.new(root, {
 
@@ -528,9 +536,10 @@ export class EMSChartComponent implements OnInit, OnDestroy {
               if (yAxisIndex === -1) {
                 // Si no existe, crear uno nuevo
                 yAxis = chart.yAxes.push(am5xy.ValueAxis.new(root, {
-
+            
                   numberFormat: unit === '%' ? '# .0%' : '##.## ' + unit,
-                  strictMinMax: false,
+                  strictMinMax: true,
+                  
                   renderer: am5xy.AxisRendererY.new(root, {
                     opposite: t === 'line',
                     strokeOpacity: 1,
@@ -585,6 +594,7 @@ export class EMSChartComponent implements OnInit, OnDestroy {
                   })
                 );
 
+                // if 
 
 
                 let sbSeries = scrollbarX.chart.series.push(
@@ -599,11 +609,24 @@ export class EMSChartComponent implements OnInit, OnDestroy {
 
 
                 sbSeries.data.setAll(data);
-                yAxis.get("renderer").labels.template.set("text", "{value} " + unit);
+                if(unit === 'kW' || unit === 'kWh'){
+                  
+                  yAxis.get("renderer").labels.template.adapters.add("text", function (text, target) {
+                    const value = parseFloat(text);
+                    if (Math.abs(value) >= 1000 && typeof value === 'number') {
+                      const unitParsed = unit === 'kW' ? 'MW' : 'MWh';
+                      return (value / 1000).toFixed(2) +  " " + unitParsed;
+                    }
+                    return text;
+                  });
+
+                }else{
+                  yAxis.get("renderer").labels.template.set("text", "{value} " + unit);
+                }
                 yAxis.get("renderer").labels.template.set("fontSize", 10);
                 // yAxis.get("renderer").labels.template.set("fill", 'rgba(0,0,0,0.8)');
-                yAxis.get("renderer").grid.template.set("forceHidden", true);
-                yAxis.get("renderer").grid.template.set("strokeOpacity", 0.07);
+                // yAxis.get("renderer").grid.template.set("forceHidden", true);
+                yAxis.get("renderer").grid.template.set("strokeOpacity", 0.05);
                 yAxis.get("renderer").ticks.template.setAll({
                   inside: false,
                   visible: true,
@@ -611,7 +634,53 @@ export class EMSChartComponent implements OnInit, OnDestroy {
 
                 })
 
+                // linea base en 0 para el eje Y 
+                const range = yAxis.createAxisRange(yAxis.makeDataItem({
+                  value: 0, // El valor en el eje Y donde quieres la línea
+                  endValue: 0, // Puede ser el mismo si quieres una línea horizontal
+                }));
 
+                // Configura el estilo de la línea base
+                range.get("grid").setAll({
+                  strokeWidth: 2, // Ancho de la línea
+                });
+
+                /*
+                * Línea base  
+                */
+
+                // const range = yAxis.createAxisRange(yAxis.makeDataItem({
+                //   value: -10000, // El valor en el eje Y donde quieres la línea
+                //   endValue: -10000, // Puede ser el mismo si quieres una línea horizontal
+                // }));
+                
+                // // Configura el estilo de la línea base
+                // range.get("grid").setAll({
+                //   stroke: am5.color(0xff0000), // Color rojo para la línea
+                //   strokeWidth: 2, // Ancho de la línea
+                //   strokeDasharray: [4, 4], // Línea punteada
+                  
+                // });
+                
+                // // Opcional: agrega una etiqueta a la línea base
+                // range.get("label").setAll({
+                //   text: "Límite: 500", // Texto de la etiqueta
+                //   isMeasured: false,
+                //   background: am5.Rectangle.new(root, {
+                //     fill: am5.color(0xffffff), // Fondo blanco para el texto
+                //     fillOpacity: 0.8,
+                //   }),
+                //   location: 0, // Ubicación en el rango, 0 significa al inicio
+                //   fontSize: 12,
+                // });
+
+                // // range stroke opacity 1
+                // range.get("grid").set("strokeOpacity", 1);
+
+
+                // series connect false
+                
+                
                 series.strokes.template.set("strokeWidth", 1.5);
                 series.data.setAll(data);
                 currentColor = series.get("fill").toCSS();
@@ -636,6 +705,7 @@ export class EMSChartComponent implements OnInit, OnDestroy {
                     valueYField: "value",
                     valueXField: "date",
                     stacked: true,
+                  
                   })
                 );
 
@@ -644,15 +714,29 @@ export class EMSChartComponent implements OnInit, OnDestroy {
                 sbSeries.data.setAll(data);
 
 
-                yAxis.get("renderer").grid.template.set("forceHidden", true);
-                yAxis.get("renderer").labels.template.set("text", "{value} " + unit);
-                yAxis.get("renderer").labels.template.set("fontSize", 10);
-                yAxis.get("renderer").ticks.template.setAll({
-                  inside: false,
-                  visible: true,
+                // yAxis.get("renderer").grid.template.set("forceHidden", true);
+  
+                // if(unit === 'kW' || unit === 'kWh'){
+                  
+                //   yAxis.get("renderer").labels.template.adapters.add("text", function (text, target) {
+                //     const value = parseFloat(text);
+                //     if (Math.abs(value) >= 1000 && typeof value === 'number') {
+                //       const unitParsed = unit === 'kW' ? 'MW' : 'MWh';
+                //       return (value / 1000).toFixed(2) +  " " + unitParsed;
+                //     }
+                //     return text;
+                //   });
 
-                })
-                console.log('data', data)
+                // }else{
+
+                //   yAxis.get("renderer").labels.template.set("text", "{value} " + unit);
+                // }
+                // yAxis.get("renderer").labels.template.set("fontSize", 10);
+                // yAxis.get("renderer").ticks.template.setAll({
+                //   inside: false,
+                //   visible: true,
+
+                // })
                 barSeries.data.setAll(data);
                 currentColor = barSeries.get("fill").toCSS();
               }
@@ -664,10 +748,6 @@ export class EMSChartComponent implements OnInit, OnDestroy {
             }
 
           }
-
-
-
-
 
           let cursor = chart.set("cursor", am5xy.XYCursor.new(root, {
             behavior: "zoomX",
@@ -681,6 +761,7 @@ export class EMSChartComponent implements OnInit, OnDestroy {
           const legend = chart.children.push(am5.Legend.new(root, {
             paddingTop: 20,
           }));
+  
 
 
           data.forEach((key) => {
@@ -693,9 +774,6 @@ export class EMSChartComponent implements OnInit, OnDestroy {
                   value: Math.round(parseFloat(item.value) * 100) / 100
                 }
               })
-
-              console.log(item)
-
               if (this.resolutionSelected.name === '1 minute') {
                 parsedData = parsedData.reverse()
               } else if (this.resolutionSelected.name === '2 minutes') {
@@ -820,7 +898,7 @@ export class EMSChartComponent implements OnInit, OnDestroy {
 
                     const postProcessing = new Function('value', key.postFuncBody);
                     return {
-                      ts: data.ts,
+                      ts: Math.floor(data.ts / 1000) * 1000,
                       value: parseFloat(postProcessing(data.value)).toFixed(2)
                     };
                   });
@@ -1059,27 +1137,7 @@ export class EMSChartComponent implements OnInit, OnDestroy {
       }
     }
   }
-  groupDataByInterval(data, interval, type = 'NONE') {
-    const groupedData = data.reduce((acc, item) => {
-      const roundedTime = Math.floor(item.date / interval) * interval;
-      if (!acc[roundedTime]) {
-        acc[roundedTime] = { date: roundedTime, value: 0 };
-      }
-      acc[roundedTime].value += item.value;
-      return acc;
-    }, {});
 
-    if (type === 'SUM') {
-      let cumulativeValue = 0;
-      return Object.values(groupedData).map((item: { date: number, value: number }) => {
-        cumulativeValue += item.value
-        return { ...item, value: cumulativeValue };
-      });
-
-    }
-
-    return Object.values(groupedData);
-  };
 
   updateSummaryTable(data) {
     const summaryTable = document.getElementById('summary-grid');
@@ -1150,3 +1208,30 @@ export class EMSChartComponent implements OnInit, OnDestroy {
 }
 
 
+function groupByInterval(data, interval) {
+  const grouped = [];
+  let currentGroup = [];
+  let currentStartTime = data[data.length - 1].date
+
+  data.forEach((point) => {
+    if (point.date < currentStartTime + interval) {
+      currentGroup.push(point.value);
+    } else {
+      // Calcular promedio del grupo actual
+      const avgValue = currentGroup.reduce((sum, value) => sum + value, 0) / currentGroup.length;
+      grouped.push({ date: currentStartTime, value: Math.round(avgValue * 100) / 100 });
+      
+      // Iniciar nuevo grupo
+      currentStartTime += interval;
+      currentGroup = [point.value];
+    }
+  });
+
+  // Agregar el último grupo
+  if (currentGroup.length > 0) {
+    const avgValue = currentGroup.reduce((sum, value) => sum + value, 0) / currentGroup.length;
+    grouped.push({ date: currentStartTime, value: Math.round(avgValue * 100) / 100 });
+  }
+
+  return grouped;
+}
